@@ -4,6 +4,7 @@ export interface Compra {
   nombre: string
   categoria: string
   precio: number
+  cantidad: number
   fecha: string
   supermercado_id?: string
   mes: number

@@ -11,7 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ShoppingCart, Mail, Lock, KeyRound } from "lucide-react"
 import { useRouter } from "next/navigation"
-import { getResetPasswordUrl } from "@/lib/utils/url"
+import { getBaseUrl, getResetPasswordUrl } from "@/lib/utils/url"
 
 export default function AuthForm() {
   const [email, setEmail] = useState("")
@@ -44,10 +44,17 @@ export default function AuthForm() {
         return
       }
 
-      // Intentar registrar el usuario directamente
+      // Intentar registrar el usuario directamente sin requerir confirmación de correo
       const { data, error } = await supabase.auth.signUp({
         email: email.toLowerCase().trim(),
         password,
+        options: {
+          // Esto hace que el usuario se registre sin necesidad de confirmar correo
+          emailRedirectTo: `${getBaseUrl()}/dashboard`,
+          data: {
+            email_confirmed: true, // Marcar como confirmado
+          },
+        },
       })
 
       if (error) {
@@ -88,7 +95,17 @@ export default function AuthForm() {
           // Usuario logueado automáticamente
           router.push("/dashboard")
         } else {
-          setMessage("¡Cuenta creada exitosamente! Revisa tu email para confirmar tu cuenta.")
+          // Iniciar sesión automáticamente después del registro
+          const { error: signInError } = await supabase.auth.signInWithPassword({
+            email: email.toLowerCase().trim(),
+            password,
+          })
+
+          if (signInError) {
+            setMessage("Cuenta creada. Por favor inicia sesión.")
+          } else {
+            router.push("/dashboard")
+          }
         }
       } else {
         setMessage("Error inesperado al crear la cuenta. Intenta nuevamente.")
@@ -126,7 +143,7 @@ export default function AuthForm() {
         } else if (error.message.includes("Email not confirmed")) {
           setMessage("Por favor confirma tu email antes de iniciar sesión. Revisa tu bandeja de entrada.")
         } else if (error.message.includes("Too many requests")) {
-          setMessage("Demasiados intentos. Espera unos minutos antes de intentar nuevamente.")
+          setMessage("Demasiados intentos. Espera unos minutos antes de solicitar otro enlace.")
         } else {
           setMessage(`Error al iniciar sesión: ${error.message}`)
         }

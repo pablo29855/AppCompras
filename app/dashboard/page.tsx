@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Plus, Search, Edit3, Trash2, CalendarDays } from "lucide-react"
+import { Plus, Search, Edit3, Trash2, CalendarDays, Package } from "lucide-react"
 import type { Compra, Supermercado } from "@/types/database"
 
 const categorias = ["Alimentación", "Transporte", "Entretenimiento", "Salud", "Ropa", "Hogar", "Tecnología", "Otros"]
@@ -46,6 +46,7 @@ export default function DashboardPage() {
     nombre: "",
     categoria: "Alimentación",
     precio: "",
+    cantidad: "1",
     fecha: "",
     supermercado_id: null,
   })
@@ -103,14 +104,20 @@ export default function DashboardPage() {
     return coincideBusqueda && coincideCategoria
   })
 
-  // Calcular totales usando todas las compras, no solo las filtradas
-  const totalMes = compras.reduce((total, compra) => total + compra.precio, 0)
+  // Calcular totales usando precio * cantidad
+  const totalMes = compras.reduce((total, compra) => total + compra.precio * compra.cantidad, 0)
   const totalHoy = compras
     .filter((compra) => compra.fecha === fechaHoy)
-    .reduce((total, compra) => total + compra.precio, 0)
+    .reduce((total, compra) => total + compra.precio * compra.cantidad, 0)
 
   const agregarCompra = async () => {
-    if (nuevaCompra.nombre && nuevaCompra.categoria && nuevaCompra.precio && nuevaCompra.fecha) {
+    if (
+      nuevaCompra.nombre &&
+      nuevaCompra.categoria &&
+      nuevaCompra.precio &&
+      nuevaCompra.cantidad &&
+      nuevaCompra.fecha
+    ) {
       try {
         const {
           data: { user },
@@ -123,6 +130,7 @@ export default function DashboardPage() {
           nombre: nuevaCompra.nombre,
           categoria: nuevaCompra.categoria,
           precio: Number.parseFloat(nuevaCompra.precio),
+          cantidad: Number.parseInt(nuevaCompra.cantidad),
           fecha: nuevaCompra.fecha,
           supermercado_id: nuevaCompra.supermercado_id,
           mes: fechaCompra.getMonth() + 1,
@@ -144,7 +152,14 @@ export default function DashboardPage() {
           setCompras(nuevasCompras)
         }
 
-        setNuevaCompra({ nombre: "", categoria: "Alimentación", precio: "", fecha: "", supermercado_id: null })
+        setNuevaCompra({
+          nombre: "",
+          categoria: "Alimentación",
+          precio: "",
+          cantidad: "1",
+          fecha: "",
+          supermercado_id: null,
+        })
         setDialogoAbierto(false)
       } catch (error) {
         console.error("Error agregando compra:", error)
@@ -153,13 +168,21 @@ export default function DashboardPage() {
   }
 
   const editarCompra = async () => {
-    if (compraEditando && nuevaCompra.nombre && nuevaCompra.categoria && nuevaCompra.precio && nuevaCompra.fecha) {
+    if (
+      compraEditando &&
+      nuevaCompra.nombre &&
+      nuevaCompra.categoria &&
+      nuevaCompra.precio &&
+      nuevaCompra.cantidad &&
+      nuevaCompra.fecha
+    ) {
       try {
         const fechaCompra = new Date(nuevaCompra.fecha)
         const compraActualizada = {
           nombre: nuevaCompra.nombre,
           categoria: nuevaCompra.categoria,
           precio: Number.parseFloat(nuevaCompra.precio),
+          cantidad: Number.parseInt(nuevaCompra.cantidad),
           fecha: nuevaCompra.fecha,
           supermercado_id: nuevaCompra.supermercado_id,
           mes: fechaCompra.getMonth() + 1,
@@ -172,7 +195,14 @@ export default function DashboardPage() {
 
         await cargarDatos()
         setCompraEditando(null)
-        setNuevaCompra({ nombre: "", categoria: "Alimentación", precio: "", fecha: "", supermercado_id: null })
+        setNuevaCompra({
+          nombre: "",
+          categoria: "Alimentación",
+          precio: "",
+          cantidad: "1",
+          fecha: "",
+          supermercado_id: null,
+        })
         setDialogoAbierto(false)
       } catch (error) {
         console.error("Error editando compra:", error)
@@ -198,6 +228,7 @@ export default function DashboardPage() {
       nombre: compra.nombre,
       categoria: compra.categoria,
       precio: compra.precio.toString(),
+      cantidad: compra.cantidad.toString(),
       fecha: compra.fecha,
       supermercado_id: compra.supermercado_id || null,
     })
@@ -207,7 +238,14 @@ export default function DashboardPage() {
   const cerrarDialogo = () => {
     setDialogoAbierto(false)
     setCompraEditando(null)
-    setNuevaCompra({ nombre: "", categoria: "Alimentación", precio: "", fecha: "", supermercado_id: null })
+    setNuevaCompra({
+      nombre: "",
+      categoria: "Alimentación",
+      precio: "",
+      cantidad: "1",
+      fecha: "",
+      supermercado_id: null,
+    })
   }
 
   if (loading) {
@@ -323,7 +361,7 @@ export default function DashboardPage() {
                       id="nombre"
                       value={nuevaCompra.nombre}
                       onChange={(e) => setNuevaCompra({ ...nuevaCompra, nombre: e.target.value })}
-                      placeholder="Ej: Compra semanal"
+                      placeholder="Ej: Pan integral"
                     />
                   </div>
                   <div>
@@ -344,17 +382,43 @@ export default function DashboardPage() {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div>
-                    <Label htmlFor="precio">Precio (COP)</Label>
-                    <Input
-                      id="precio"
-                      type="number"
-                      step="1"
-                      value={nuevaCompra.precio}
-                      onChange={(e) => setNuevaCompra({ ...nuevaCompra, precio: e.target.value })}
-                      placeholder="0"
-                    />
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="precio">Precio Unitario (COP)</Label>
+                      <Input
+                        id="precio"
+                        type="number"
+                        step="1"
+                        value={nuevaCompra.precio}
+                        onChange={(e) => setNuevaCompra({ ...nuevaCompra, precio: e.target.value })}
+                        placeholder="1000"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="cantidad">Cantidad</Label>
+                      <Input
+                        id="cantidad"
+                        type="number"
+                        min="1"
+                        step="1"
+                        value={nuevaCompra.cantidad}
+                        onChange={(e) => setNuevaCompra({ ...nuevaCompra, cantidad: e.target.value })}
+                        placeholder="1"
+                      />
+                    </div>
                   </div>
+                  {nuevaCompra.precio && nuevaCompra.cantidad && (
+                    <div className="p-3 bg-gray-50 rounded-lg">
+                      <div className="text-sm text-gray-600">Total de esta compra:</div>
+                      <div className="text-lg font-bold text-green-600">
+                        $
+                        {(
+                          Number.parseFloat(nuevaCompra.precio || "0") * Number.parseInt(nuevaCompra.cantidad || "1")
+                        ).toLocaleString("es-CO")}{" "}
+                        COP
+                      </div>
+                    </div>
+                  )}
                   <div>
                     <Label htmlFor="fecha">Fecha</Label>
                     <Input
@@ -421,9 +485,11 @@ export default function DashboardPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Nombre</TableHead>
+                    <TableHead>Producto</TableHead>
                     <TableHead>Categoría</TableHead>
-                    <TableHead>Precio</TableHead>
+                    <TableHead>Precio Unit.</TableHead>
+                    <TableHead>Cantidad</TableHead>
+                    <TableHead>Total</TableHead>
                     <TableHead>Fecha</TableHead>
                     <TableHead>Supermercado</TableHead>
                     <TableHead className="text-right">Acciones</TableHead>
@@ -438,7 +504,16 @@ export default function DashboardPage() {
                           {compra.categoria}
                         </Badge>
                       </TableCell>
-                      <TableCell className="font-semibold">${compra.precio.toLocaleString("es-CO")} COP</TableCell>
+                      <TableCell>${compra.precio.toLocaleString("es-CO")} COP</TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1">
+                          <Package className="h-4 w-4 text-gray-400" />
+                          {compra.cantidad}
+                        </div>
+                      </TableCell>
+                      <TableCell className="font-semibold text-green-600">
+                        ${(compra.precio * compra.cantidad).toLocaleString("es-CO")} COP
+                      </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
                           <CalendarDays className="h-4 w-4 text-gray-400" />
