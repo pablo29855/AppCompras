@@ -1,5 +1,7 @@
 "use client"
 
+import { DialogFooter } from "@/components/ui/dialog"
+
 import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -10,7 +12,6 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -59,34 +60,63 @@ export default function SupermercadosPage() {
   }
 
   const agregarSupermercado = async () => {
-    if (nuevoSupermercado.nombre) {
-      try {
-        const {
-          data: { user },
-        } = await supabase.auth.getUser()
-        if (!user) return
+    if (!nuevoSupermercado.nombre.trim()) {
+      alert("El nombre del supermercado es obligatorio.")
+      return
+    }
 
-        const supermercado = {
-          user_id: user.id,
-          nombre: nuevoSupermercado.nombre,
-          direccion: nuevoSupermercado.direccion || null,
-          latitud: nuevoSupermercado.latitud ? Number.parseFloat(nuevoSupermercado.latitud) : null,
-          longitud: nuevoSupermercado.longitud ? Number.parseFloat(nuevoSupermercado.longitud) : null,
-        }
-
-        const { data, error } = await supabase.from("supermercados").insert(supermercado).select()
-
-        if (error) throw error
-
-        if (data && data[0]) {
-          setSupermercados([...supermercados, data[0]])
-        }
-
-        setNuevoSupermercado({ nombre: "", direccion: "", latitud: "", longitud: "" })
-        setDialogoAbierto(false)
-      } catch (error) {
-        console.error("Error agregando supermercado:", error)
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (!user) {
+        alert("Error: Usuario no autenticado")
+        return
       }
+
+      const supermercado = {
+        user_id: user.id,
+        nombre: nuevoSupermercado.nombre.trim(),
+        direccion: nuevoSupermercado.direccion.trim() || null,
+        latitud: nuevoSupermercado.latitud ? Number.parseFloat(nuevoSupermercado.latitud) : null,
+        longitud: nuevoSupermercado.longitud ? Number.parseFloat(nuevoSupermercado.longitud) : null,
+      }
+
+      // Validar coordenadas si se proporcionan
+      if (
+        supermercado.latitud &&
+        (isNaN(supermercado.latitud) || supermercado.latitud < -90 || supermercado.latitud > 90)
+      ) {
+        alert("La latitud debe estar entre -90 y 90 grados.")
+        return
+      }
+
+      if (
+        supermercado.longitud &&
+        (isNaN(supermercado.longitud) || supermercado.longitud < -180 || supermercado.longitud > 180)
+      ) {
+        alert("La longitud debe estar entre -180 y 180 grados.")
+        return
+      }
+
+      const { data, error } = await supabase.from("supermercados").insert(supermercado).select()
+
+      if (error) {
+        console.error("Error de Supabase:", error)
+        alert(`Error al agregar supermercado: ${error.message}`)
+        return
+      }
+
+      if (data && data[0]) {
+        setSupermercados([...supermercados, data[0]])
+        alert("¡Supermercado agregado exitosamente!")
+      }
+
+      setNuevoSupermercado({ nombre: "", direccion: "", latitud: "", longitud: "" })
+      setDialogoAbierto(false)
+    } catch (error) {
+      console.error("Error agregando supermercado:", error)
+      alert("Error inesperado al agregar el supermercado. Por favor intenta nuevamente.")
     }
   }
 
@@ -147,20 +177,66 @@ export default function SupermercadosPage() {
   }
 
   const obtenerUbicacionActual = () => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setNuevoSupermercado({
-            ...nuevoSupermercado,
-            latitud: position.coords.latitude.toString(),
-            longitud: position.coords.longitude.toString(),
-          })
-        },
-        (error) => {
-          console.error("Error obteniendo ubicación:", error)
-        },
-      )
+    if (!navigator.geolocation) {
+      alert("La geolocalización no está soportada en este navegador.")
+      return
     }
+
+    // Mostrar loading
+    const button = document.querySelector("[data-location-btn]")
+    if (button) {
+      button.textContent = "Obteniendo ubicación..."
+      button.disabled = true
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setNuevoSupermercado({
+          ...nuevoSupermercado,
+          latitud: position.coords.latitude.toFixed(6),
+          longitud: position.coords.longitude.toFixed(6),
+        })
+
+        // Restaurar botón
+        if (button) {
+          button.textContent = "Usar mi ubicación actual"
+          button.disabled = false
+        }
+
+        alert("¡Ubicación obtenida exitosamente!")
+      },
+      (error) => {
+        let errorMessage = "Error obteniendo ubicación: "
+        switch (error.code) {
+          case error.PERMISSION_DENIED:
+            errorMessage += "Permiso denegado. Por favor permite el acceso a tu ubicación."
+            break
+          case error.POSITION_UNAVAILABLE:
+            errorMessage += "Ubicación no disponible."
+            break
+          case error.TIMEOUT:
+            errorMessage += "Tiempo de espera agotado."
+            break
+          default:
+            errorMessage += "Error desconocido."
+            break
+        }
+
+        alert(errorMessage)
+        console.error("Error de geolocalización:", error)
+
+        // Restaurar botón
+        if (button) {
+          button.textContent = "Usar mi ubicación actual"
+          button.disabled = false
+        }
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 60000,
+      },
+    )
   }
 
   if (loading) {
@@ -242,7 +318,13 @@ export default function SupermercadosPage() {
                   />
                 </div>
               </div>
-              <Button type="button" variant="outline" onClick={obtenerUbicacionActual} className="w-full">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={obtenerUbicacionActual}
+                className="w-full"
+                data-location-btn
+              >
                 <MapPin className="h-4 w-4 mr-2" />
                 Usar mi ubicación actual
               </Button>

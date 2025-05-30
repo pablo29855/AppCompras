@@ -200,38 +200,113 @@ export default function CompararPreciosPage() {
   }
 
   const agregarProducto = async () => {
-    if (nuevoProducto.nombre && nuevoProducto.categoria) {
-      try {
-        const {
-          data: { user },
-        } = await supabase.auth.getUser()
-        if (!user) return
+    if (!nuevoProducto.nombre.trim()) {
+      alert("El nombre del producto es obligatorio.")
+      return
+    }
 
-        const producto = {
-          user_id: user.id,
-          nombre: nuevoProducto.nombre,
-          categoria: nuevoProducto.categoria,
-        }
+    if (!nuevoProducto.categoria) {
+      alert("La categoría es obligatoria.")
+      return
+    }
 
-        const { data, error } = await supabase.from("productos").insert(producto).select()
-
-        if (error) throw error
-
-        if (data && data[0]) {
-          setProductos([...productos, data[0]])
-        }
-
-        setNuevoProducto({ nombre: "", categoria: "Alimentación" })
-        setDialogoProducto(false)
-      } catch (error) {
-        console.error("Error agregando producto:", error)
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (!user) {
+        alert("Error: Usuario no autenticado")
+        return
       }
+
+      // Verificar si el producto ya existe
+      const { data: productoExistente } = await supabase
+        .from("productos")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("nombre", nuevoProducto.nombre.trim())
+        .eq("categoria", nuevoProducto.categoria)
+        .single()
+
+      if (productoExistente) {
+        alert("Ya existe un producto con este nombre en la misma categoría.")
+        return
+      }
+
+      const producto = {
+        user_id: user.id,
+        nombre: nuevoProducto.nombre.trim(),
+        categoria: nuevoProducto.categoria,
+      }
+
+      const { data, error } = await supabase.from("productos").insert(producto).select()
+
+      if (error) {
+        console.error("Error de Supabase:", error)
+        alert(`Error al agregar producto: ${error.message}`)
+        return
+      }
+
+      if (data && data[0]) {
+        setProductos([...productos, data[0]])
+        alert("¡Producto agregado exitosamente!")
+      }
+
+      setNuevoProducto({ nombre: "", categoria: "Alimentación" })
+      setDialogoProducto(false)
+    } catch (error) {
+      console.error("Error agregando producto:", error)
+      alert("Error inesperado al agregar el producto. Por favor intenta nuevamente.")
     }
   }
 
   const agregarPrecio = async () => {
-    if (nuevoPrecio.producto_id && nuevoPrecio.supermercado_id && nuevoPrecio.precio) {
-      try {
+    if (!nuevoPrecio.producto_id) {
+      alert("Debes seleccionar un producto.")
+      return
+    }
+
+    if (!nuevoPrecio.supermercado_id) {
+      alert("Debes seleccionar un supermercado.")
+      return
+    }
+
+    if (!nuevoPrecio.precio || Number.parseFloat(nuevoPrecio.precio) <= 0) {
+      alert("El precio debe ser mayor a 0.")
+      return
+    }
+
+    try {
+      // Verificar si ya existe un precio para este producto en este supermercado
+      const { data: precioExistente } = await supabase
+        .from("precios_productos")
+        .select("id")
+        .eq("producto_id", nuevoPrecio.producto_id)
+        .eq("supermercado_id", nuevoPrecio.supermercado_id)
+        .single()
+
+      if (precioExistente) {
+        const confirmar = confirm("Ya existe un precio para este producto en este supermercado. ¿Deseas actualizarlo?")
+        if (!confirmar) return
+
+        // Actualizar precio existente
+        const { error: updateError } = await supabase
+          .from("precios_productos")
+          .update({
+            precio: Number.parseFloat(nuevoPrecio.precio),
+            fecha_actualizacion: new Date().toISOString().split("T")[0],
+          })
+          .eq("id", precioExistente.id)
+
+        if (updateError) {
+          alert(`Error al actualizar precio: ${updateError.message}`)
+          return
+        }
+
+        alert("¡Precio actualizado exitosamente!")
+        await cargarDatos() // Recargar datos
+      } else {
+        // Crear nuevo precio
         const precio = {
           producto_id: nuevoPrecio.producto_id,
           supermercado_id: nuevoPrecio.supermercado_id,
@@ -248,17 +323,23 @@ export default function CompararPreciosPage() {
             supermercado:supermercados(*)
           `)
 
-        if (error) throw error
+        if (error) {
+          console.error("Error de Supabase:", error)
+          alert(`Error al agregar precio: ${error.message}`)
+          return
+        }
 
         if (data && data[0]) {
           setPrecios([data[0], ...precios])
+          alert("¡Precio agregado exitosamente!")
         }
-
-        setNuevoPrecio({ producto_id: "", supermercado_id: "", precio: "" })
-        setDialogoPrecio(false)
-      } catch (error) {
-        console.error("Error agregando precio:", error)
       }
+
+      setNuevoPrecio({ producto_id: "", supermercado_id: "", precio: "" })
+      setDialogoPrecio(false)
+    } catch (error) {
+      console.error("Error agregando precio:", error)
+      alert("Error inesperado al agregar el precio. Por favor intenta nuevamente.")
     }
   }
 
