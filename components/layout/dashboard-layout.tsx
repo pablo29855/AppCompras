@@ -51,7 +51,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-green-600"></div>
       </div>
     )
@@ -64,8 +64,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   return (
     <div className="min-h-screen bg-gray-50 flex">
       <Sidebar userEmail={user.email} />
-      <main className="flex-1 md:ml-0">
-        <div className="p-4 md:p-6 pt-16 md:pt-6">{children}</div>
+      <main className="flex-1 md:ml-0 min-w-0">
+        <div className="p-2 sm:p-4 md:p-6 pt-16 md:pt-6 max-w-7xl mx-auto w-full">{children}</div>
       </main>
     </div>
   )
