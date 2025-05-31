@@ -25,7 +25,7 @@ export default function ResetPasswordPage() {
   useEffect(() => {
     const handleAuthCallback = async () => {
       try {
-       
+        // Verificar parámetros de error en la URL
         const error = searchParams.get("error");
         const errorCode = searchParams.get("error_code");
         const errorDescription = searchParams.get("error_description");
@@ -37,38 +37,43 @@ export default function ResetPasswordPage() {
           return;
         }
 
-        const code = searchParams.get("code");
-        if (!code) {
-          setMessage("No se encontró el código de restablecimiento en el enlace. Solicita un nuevo enlace.");
+        const token = searchParams.get("token");
+        if (!token) {
+          setMessage("No se encontró el token de restablecimiento en el enlace. Solicita un nuevo enlace.");
           setIsValidSession(false);
           setCheckingSession(false);
           return;
         }
 
-        console.log("Código recibido:", code);
+        console.log("Token recibido:", token); // Para depuración
 
-        
+        // Cerrar cualquier sesión activa para evitar conflictos
         await supabase.auth.signOut();
 
-        
-        const { data, error: authError } = await supabase.auth.exchangeCodeForSession(code);
+        // Verificar el token de restablecimiento
+        const { error: verifyError } = await supabase.auth.verifyOtp({
+          token,
+          type: "recovery",
+        });
 
-        if (authError) {
-          console.error("Error al intercambiar el código:", authError.message);
-          if (authError.message.includes("code verifier")) {
-            setMessage("Error en el flujo de autenticación. Solicita un nuevo enlace de restablecimiento.");
-          } else if (authError.code === "invalid_grant") {
-            setMessage("El enlace de restablecimiento ha expirado o ya se usó. Solicita un nuevo enlace.");
+        if (verifyError) {
+          console.error("Error al verificar el token:", verifyError.message);
+          if (verifyError.message.includes("Invalid token")) {
+            setMessage("El enlace de restablecimiento es inválido o ha expirado. Solicita un nuevo enlace.");
           } else {
-            setMessage(`Error: ${authError.message}`);
+            setMessage(`Error: ${verifyError.message}`);
           }
           setIsValidSession(false);
-        } else if (data.session) {
-          setIsValidSession(true);
-          setMessage("");
         } else {
-          setMessage("No se pudo validar la sesión. Intenta solicitar un nuevo enlace.");
-          setIsValidSession(false);
+          // Verificar si hay una sesión activa después de verificar el OTP
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session) {
+            setIsValidSession(true);
+            setMessage("");
+          } else {
+            setMessage("No se pudo establecer la sesión. Intenta solicitar un nuevo enlace.");
+            setIsValidSession(false);
+          }
         }
       } catch (error) {
         console.error("Error inesperado:", error);
