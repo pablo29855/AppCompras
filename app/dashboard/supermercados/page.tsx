@@ -25,6 +25,7 @@ export default function SupermercadosPage() {
   const [dialogoAbierto, setDialogoAbierto] = useState(false)
   const [supermercadoEditando, setSupermercadoEditando] = useState<Supermercado | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
   const [nuevoSupermercado, setNuevoSupermercado] = useState({
     nombre: "",
     direccion: "",
@@ -53,7 +54,7 @@ export default function SupermercadosPage() {
 
       setSupermercados(supermercadosData || [])
     } catch (error) {
-      console.error("Error cargando supermercados:", error)
+      setError("Error cargando supermercados:", error)
     } finally {
       setLoading(false)
     }
@@ -61,7 +62,7 @@ export default function SupermercadosPage() {
 
   const agregarSupermercado = async () => {
     if (!nuevoSupermercado.nombre.trim()) {
-      alert("El nombre del supermercado es obligatorio.")
+      setError("El nombre del supermercado es obligatorio.")
       return
     }
 
@@ -70,7 +71,7 @@ export default function SupermercadosPage() {
         data: { user },
       } = await supabase.auth.getUser()
       if (!user) {
-        alert("Error: Usuario no autenticado")
+        setError("Error: Usuario no autenticado")
         return
       }
 
@@ -87,7 +88,7 @@ export default function SupermercadosPage() {
         supermercado.latitud &&
         (isNaN(supermercado.latitud) || supermercado.latitud < -90 || supermercado.latitud > 90)
       ) {
-        alert("La latitud debe estar entre -90 y 90 grados.")
+        setError("La latitud debe estar entre -90 y 90 grados.")
         return
       }
 
@@ -95,28 +96,28 @@ export default function SupermercadosPage() {
         supermercado.longitud &&
         (isNaN(supermercado.longitud) || supermercado.longitud < -180 || supermercado.longitud > 180)
       ) {
-        alert("La longitud debe estar entre -180 y 180 grados.")
+        setError("La longitud debe estar entre -180 y 180 grados.")
         return
       }
 
       const { data, error } = await supabase.from("supermercados").insert(supermercado).select()
 
       if (error) {
-        console.error("Error de Supabase:", error)
-        alert(`Error al agregar supermercado: ${error.message}`)
+        setError("Error de Supabase:", error)
+        setError(`Error al agregar supermercado: ${error.message}`)
         return
       }
 
       if (data && data[0]) {
         setSupermercados([...supermercados, data[0]])
-        alert("¡Supermercado agregado exitosamente!")
+        setError("¡Supermercado agregado exitosamente!")
       }
 
       setNuevoSupermercado({ nombre: "", direccion: "", latitud: "", longitud: "" })
       setDialogoAbierto(false)
     } catch (error) {
-      console.error("Error agregando supermercado:", error)
-      alert("Error inesperado al agregar el supermercado. Por favor intenta nuevamente.")
+      setError("Error agregando supermercado:", error)
+      setError("Error inesperado al agregar el supermercado. Por favor intenta nuevamente.")
     }
   }
 
@@ -142,7 +143,7 @@ export default function SupermercadosPage() {
         setNuevoSupermercado({ nombre: "", direccion: "", latitud: "", longitud: "" })
         setDialogoAbierto(false)
       } catch (error) {
-        console.error("Error editando supermercado:", error)
+        setError("Error editando supermercado:", error)
       }
     }
   }
@@ -155,7 +156,7 @@ export default function SupermercadosPage() {
 
       setSupermercados(supermercados.filter((supermercado) => supermercado.id !== id))
     } catch (error) {
-      console.error("Error eliminando supermercado:", error)
+      setError("Error eliminando supermercado:", error)
     }
   }
 
@@ -178,7 +179,7 @@ export default function SupermercadosPage() {
 
   const obtenerUbicacionActual = () => {
     if (!navigator.geolocation) {
-      alert("La geolocalización no está soportada en este navegador.")
+      setError("La geolocalización no está soportada en este navegador.")
       return
     }
 
@@ -203,7 +204,7 @@ export default function SupermercadosPage() {
           button.disabled = false
         }
 
-        alert("¡Ubicación obtenida exitosamente!")
+        setError("¡Ubicación obtenida exitosamente!")
       },
       (error) => {
         let errorMessage = "Error obteniendo ubicación: "
@@ -222,8 +223,8 @@ export default function SupermercadosPage() {
             break
         }
 
-        alert(errorMessage)
-        console.error("Error de geolocalización:", error)
+        setError(errorMessage)
+        setError("Error de geolocalización:", error)
 
         // Restaurar botón
         if (button) {
