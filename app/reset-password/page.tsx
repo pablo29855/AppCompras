@@ -25,12 +25,10 @@ export default function ResetPasswordPage() {
   useEffect(() => {
     const handleAuthCallback = async () => {
       try {
-        // Depuración: Imprimir la URL completa y los parámetros
         const currentUrl = window.location.href;
         console.log("URL completa:", currentUrl);
         console.log("Parámetros de búsqueda:", Object.fromEntries(searchParams.entries()));
 
-        // Verificar parámetros de error en la URL
         const error = searchParams.get("error");
         const errorCode = searchParams.get("error_code");
         const errorDescription = searchParams.get("error_description");
@@ -47,7 +45,6 @@ export default function ResetPasswordPage() {
           return;
         }
 
-        // Obtener el token o code
         const token = searchParams.get("token") || searchParams.get("code");
         console.log("Token/Code recibido:", token);
 
@@ -58,34 +55,18 @@ export default function ResetPasswordPage() {
           return;
         }
 
-        // Cerrar cualquier sesión activa para evitar conflictos
         await supabase.auth.signOut();
 
-        // Verificar el token de restablecimiento
-        const { error: verifyError } = await supabase.auth.verifyOtp({
-          token,
-          type: "recovery",
-        });
+        const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(token);
 
-        if (verifyError) {
-          console.error("Error al verificar el token:", verifyError);
-          if (verifyError.message.includes("Invalid token")) {
-            setMessage("El enlace de restablecimiento es inválido o ha expirado. Solicita un nuevo enlace.");
-          } else {
-            setMessage(`Error al verificar el token: ${verifyError.message}`);
-          }
+        if (exchangeError) {
+          console.error("Error al intercambiar el token por una sesión:", exchangeError);
+          setMessage(`Error al verificar el token: ${exchangeError.message}`);
           setIsValidSession(false);
         } else {
-          // Verificar si hay una sesión activa después de verificar el OTP
-          const { data: { session } } = await supabase.auth.getSession();
-          console.log("Sesión después de verifyOtp:", session);
-          if (session) {
-            setIsValidSession(true);
-            setMessage("");
-          } else {
-            setMessage("No se pudo establecer la sesión. Intenta solicitar un nuevo enlace.");
-            setIsValidSession(false);
-          }
+          console.log("Sesión iniciada correctamente:", data?.session);
+          setIsValidSession(true);
+          setMessage("");
         }
       } catch (error) {
         console.error("Error inesperado:", error);
