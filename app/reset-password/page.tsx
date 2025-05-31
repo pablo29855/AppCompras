@@ -1,117 +1,120 @@
-"use client"
+"use client";
 
-import type React from "react"
-
-import { useState, useEffect } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
-import { createClient } from "@/lib/supabase/client"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { ShoppingCart, Lock, CheckCircle, AlertCircle } from "lucide-react"
+import type React from "react";
+import { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ShoppingCart, Lock, CheckCircle, AlertCircle } from "lucide-react";
 
 export default function ResetPasswordPage() {
-  const [password, setPassword] = useState("")
-  const [confirmPassword, setConfirmPassword] = useState("")
-  const [loading, setLoading] = useState(false)
-  const [message, setMessage] = useState("")
-  const [isSuccess, setIsSuccess] = useState(false)
-  const [isValidSession, setIsValidSession] = useState(false)
-  const [checkingSession, setCheckingSession] = useState(true)
-  const router = useRouter()
-  const searchParams = useSearchParams()
-  const supabase = createClient()
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState("");
+  const [isSuccess, setIsSuccess] = useState(false);
+  const [isValidSession, setIsValidSession] = useState(false);
+  const [checkingSession, setCheckingSession] = useState(true);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const supabase = createClient();
 
   useEffect(() => {
     const handleAuthCallback = async () => {
       try {
-        // Verificar si hay un código en la URL (desde el email)
-        const code = searchParams.get("code")
+       
+        const error = searchParams.get("error");
+        const errorCode = searchParams.get("error_code");
+        const errorDescription = searchParams.get("error_description");
 
-        if (code) {
-          // Intercambiar el código por una sesión
-          const { data, error } = await supabase.auth.exchangeCodeForSession(code)
+        if (error && errorCode === "otp_expired") {
+          setMessage("El enlace de restablecimiento ha expirado. Solicita un nuevo enlace.");
+          setIsValidSession(false);
+          setCheckingSession(false);
+          return;
+        }
 
-          if (error) {
-            console.error("Error exchanging code:", error)
-            setMessage("El enlace de restablecimiento es inválido o ha expirado.")
-            setIsValidSession(false)
-          } else if (data.session) {
-            setIsValidSession(true)
-            setMessage("")
+        const code = searchParams.get("code");
+        if (!code) {
+          setMessage("No se encontró el código de restablecimiento en el enlace. Solicita un nuevo enlace.");
+          setIsValidSession(false);
+          setCheckingSession(false);
+          return;
+        }
+
+        console.log("Código recibido:", code);
+
+        
+        await supabase.auth.signOut();
+
+        
+        const { data, error: authError } = await supabase.auth.exchangeCodeForSession(code);
+
+        if (authError) {
+          console.error("Error al intercambiar el código:", authError.message);
+          if (authError.message.includes("code verifier")) {
+            setMessage("Error en el flujo de autenticación. Solicita un nuevo enlace de restablecimiento.");
+          } else if (authError.code === "invalid_grant") {
+            setMessage("El enlace de restablecimiento ha expirado o ya se usó. Solicita un nuevo enlace.");
           } else {
-            setMessage("No se pudo establecer la sesión. Intenta solicitar un nuevo enlace.")
-            setIsValidSession(false)
+            setMessage(`Error: ${authError.message}`);
           }
+          setIsValidSession(false);
+        } else if (data.session) {
+          setIsValidSession(true);
+          setMessage("");
         } else {
-          // Verificar si ya hay una sesión activa
-          const {
-            data: { session },
-          } = await supabase.auth.getSession()
-
-          if (session) {
-            setIsValidSession(true)
-          } else {
-            setMessage(
-              "Enlace de restablecimiento inválido. Solicita un nuevo enlace desde la página de inicio de sesión.",
-            )
-            setIsValidSession(false)
-          }
+          setMessage("No se pudo validar la sesión. Intenta solicitar un nuevo enlace.");
+          setIsValidSession(false);
         }
       } catch (error) {
-        console.error("Error handling auth callback:", error)
-        setMessage("Error al procesar el enlace. Intenta solicitar un nuevo enlace.")
-        setIsValidSession(false)
+        console.error("Error inesperado:", error);
+        setMessage("Error al procesar el enlace. Solicita un nuevo enlace.");
+        setIsValidSession(false);
       } finally {
-        setCheckingSession(false)
+        setCheckingSession(false);
       }
-    }
+    };
 
-    handleAuthCallback()
-  }, [searchParams, supabase.auth])
+    handleAuthCallback();
+  }, [searchParams, supabase.auth]);
 
   const handleResetPassword = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
-    setMessage("")
+    e.preventDefault();
+    setLoading(true);
+    setMessage("");
 
-    // Validaciones
     if (password !== confirmPassword) {
-      setMessage("Las contraseñas no coinciden")
-      setLoading(false)
-      return
+      setMessage("Las contraseñas no coinciden");
+      setLoading(false);
+      return;
     }
 
     if (password.length < 6) {
-      setMessage("La contraseña debe tener al menos 6 caracteres")
-      setLoading(false)
-      return
+      setMessage("La contraseña debe tener al menos 6 caracteres");
+      setLoading(false);
+      return;
     }
 
     try {
-      const { error } = await supabase.auth.updateUser({
-        password: password,
-      })
-
+      const { error } = await supabase.auth.updateUser({ password });
       if (error) {
-        setMessage(error.message)
+        setMessage(error.message);
       } else {
-        setIsSuccess(true)
-        setMessage("¡Contraseña actualizada exitosamente!")
-
-        // Redirigir después de 3 segundos
-        setTimeout(() => {
-          router.push("/dashboard")
-        }, 3000)
+        setIsSuccess(true);
+        setMessage("¡Contraseña actualizada exitosamente!");
+        setTimeout(() => router.push("/dashboard"), 3000);
       }
     } catch (error) {
-      console.error("Error updating password:", error)
-      setMessage("Error al actualizar la contraseña. Intenta nuevamente.")
+      console.error("Error al actualizar la contraseña:", error);
+      setMessage("Error al actualizar la contraseña. Intenta nuevamente.");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   if (checkingSession) {
     return (
@@ -125,7 +128,7 @@ export default function ResetPasswordPage() {
           </CardContent>
         </Card>
       </div>
-    )
+    );
   }
 
   if (!isValidSession) {
@@ -152,7 +155,7 @@ export default function ResetPasswordPage() {
           </CardContent>
         </Card>
       </div>
-    )
+    );
   }
 
   if (isSuccess) {
@@ -177,7 +180,7 @@ export default function ResetPasswordPage() {
           </CardContent>
         </Card>
       </div>
-    )
+    );
   }
 
   return (
@@ -245,5 +248,5 @@ export default function ResetPasswordPage() {
         </CardContent>
       </Card>
     </div>
-  )
+  );
 }
