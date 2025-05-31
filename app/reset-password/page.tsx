@@ -57,11 +57,14 @@ export default function ResetPasswordPage() {
 
         await supabase.auth.signOut();
 
-        const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(token);
+        const { data, error: verifyError } = await supabase.auth.verifyOtp({
+          token,
+          type: "recovery",
+        });
 
-        if (exchangeError) {
-          console.error("Error al intercambiar el token por una sesión:", exchangeError);
-          setMessage(`Error al verificar el token: ${exchangeError.message}`);
+        if (verifyError) {
+          console.error("Error al verificar el token:", verifyError);
+          setMessage(`Error al verificar el token: ${verifyError.message}`);
           setIsValidSession(false);
         } else {
           console.log("Sesión iniciada correctamente:", data?.session);
