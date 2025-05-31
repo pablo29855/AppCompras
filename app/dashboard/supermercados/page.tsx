@@ -1,7 +1,6 @@
 "use client"
 
 import { DialogFooter } from "@/components/ui/dialog"
-
 import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -44,7 +43,10 @@ export default function SupermercadosPage() {
       const {
         data: { user },
       } = await supabase.auth.getUser()
-      if (!user) return
+      if (!user) {
+        setError("Usuario no autenticado")
+        return
+      }
 
       const { data: supermercadosData } = await supabase
         .from("supermercados")
@@ -54,15 +56,18 @@ export default function SupermercadosPage() {
 
       setSupermercados(supermercadosData || [])
     } catch (error) {
-      setError("Error cargando supermercados:", error)
+      setError("Error al cargar supermercados. Por favor intenta nuevamente.")
     } finally {
       setLoading(false)
     }
   }
 
   const agregarSupermercado = async () => {
+    setError("") // Limpiar errores previos
+
+    // Validar campo obligatorio
     if (!nuevoSupermercado.nombre.trim()) {
-      setError("El nombre del supermercado es obligatorio.")
+      setError("El nombre del supermercado es obligatorio")
       return
     }
 
@@ -71,7 +76,7 @@ export default function SupermercadosPage() {
         data: { user },
       } = await supabase.auth.getUser()
       if (!user) {
-        setError("Error: Usuario no autenticado")
+        setError("Usuario no autenticado")
         return
       }
 
@@ -88,7 +93,7 @@ export default function SupermercadosPage() {
         supermercado.latitud &&
         (isNaN(supermercado.latitud) || supermercado.latitud < -90 || supermercado.latitud > 90)
       ) {
-        setError("La latitud debe estar entre -90 y 90 grados.")
+        setError("La latitud debe estar entre -90 y 90 grados")
         return
       }
 
@@ -96,67 +101,91 @@ export default function SupermercadosPage() {
         supermercado.longitud &&
         (isNaN(supermercado.longitud) || supermercado.longitud < -180 || supermercado.longitud > 180)
       ) {
-        setError("La longitud debe estar entre -180 y 180 grados.")
+        setError("La longitud debe estar entre -180 y 180 grados")
         return
       }
 
-      const { data, error } = await supabase.from("supermercados").insert(supermercado).select()
+      const { data, error: supabaseError } = await supabase.from("supermercados").insert(supermercado).select()
 
-      if (error) {
-        setError("Error de Supabase:", error)
-        setError(`Error al agregar supermercado: ${error.message}`)
+      if (supabaseError) {
+        setError(`Error al agregar supermercado: ${supabaseError.message}`)
         return
       }
 
       if (data && data[0]) {
         setSupermercados([...supermercados, data[0]])
-        setError("¡Supermercado agregado exitosamente!")
+        cerrarDialogo() // Cierra el diálogo y limpia el formulario
       }
-
-      setNuevoSupermercado({ nombre: "", direccion: "", latitud: "", longitud: "" })
-      setDialogoAbierto(false)
     } catch (error) {
-      setError("Error agregando supermercado:", error)
       setError("Error inesperado al agregar el supermercado. Por favor intenta nuevamente.")
     }
   }
 
   const editarSupermercado = async () => {
-    if (supermercadoEditando && nuevoSupermercado.nombre) {
+    setError("") // Limpiar errores previos
+
+    // Validar campo obligatorio
+    if (!nuevoSupermercado.nombre.trim()) {
+      setError("El nombre del supermercado es obligatorio")
+      return
+    }
+
+    if (supermercadoEditando) {
       try {
         const supermercadoActualizado = {
-          nombre: nuevoSupermercado.nombre,
-          direccion: nuevoSupermercado.direccion || null,
+          nombre: nuevoSupermercado.nombre.trim(),
+          direccion: nuevoSupermercado.direccion.trim() || null,
           latitud: nuevoSupermercado.latitud ? Number.parseFloat(nuevoSupermercado.latitud) : null,
           longitud: nuevoSupermercado.longitud ? Number.parseFloat(nuevoSupermercado.longitud) : null,
         }
 
-        const { error } = await supabase
+        // Validar coordenadas si se proporcionan
+        if (
+          supermercadoActualizado.latitud &&
+          (isNaN(supermercadoActualizado.latitud) || supermercadoActualizado.latitud < -90 || supermercadoActualizado.latitud > 90)
+        ) {
+          setError("La latitud debe estar entre -90 y 90 grados")
+          return
+        }
+
+        if (
+          supermercadoActualizado.longitud &&
+          (isNaN(supermercadoActualizado.longitud) || supermercadoActualizado.longitud < -180 || supermercadoActualizado.longitud > 180)
+        ) {
+          setError("La longitud debe estar entre -180 y 180 grados")
+          return
+        }
+
+        const { error: supabaseError } = await supabase
           .from("supermercados")
           .update(supermercadoActualizado)
           .eq("id", supermercadoEditando.id)
 
-        if (error) throw error
+        if (supabaseError) {
+          setError(`Error al editar supermercado: ${supabaseError.message}`)
+          return
+        }
 
         await cargarSupermercados()
-        setSupermercadoEditando(null)
-        setNuevoSupermercado({ nombre: "", direccion: "", latitud: "", longitud: "" })
-        setDialogoAbierto(false)
+        cerrarDialogo() // Cierra el diálogo y limpia el formulario
       } catch (error) {
-        setError("Error editando supermercado:", error)
+        setError("Error inesperado al editar el supermercado. Por favor intenta nuevamente.")
       }
     }
   }
 
   const eliminarSupermercado = async (id: string) => {
     try {
-      const { error } = await supabase.from("supermercados").delete().eq("id", id)
+      const { error: supabaseError } = await supabase.from("supermercados").delete().eq("id", id)
 
-      if (error) throw error
+      if (supabaseError) {
+        setError(`Error al eliminar supermercado: ${supabaseError.message}`)
+        return
+      }
 
       setSupermercados(supermercados.filter((supermercado) => supermercado.id !== id))
     } catch (error) {
-      setError("Error eliminando supermercado:", error)
+      setError("Error inesperado al eliminar el supermercado. Por favor intenta nuevamente.")
     }
   }
 
@@ -169,17 +198,19 @@ export default function SupermercadosPage() {
       longitud: supermercado.longitud?.toString() || "",
     })
     setDialogoAbierto(true)
+    setError("") // Limpiar errores al abrir el diálogo
   }
 
   const cerrarDialogo = () => {
     setDialogoAbierto(false)
     setSupermercadoEditando(null)
     setNuevoSupermercado({ nombre: "", direccion: "", latitud: "", longitud: "" })
+    setError("") // Limpiar errores al cerrar el diálogo
   }
 
   const obtenerUbicacionActual = () => {
     if (!navigator.geolocation) {
-      setError("La geolocalización no está soportada en este navegador.")
+      setError("La geolocalización no está soportada en este navegador")
       return
     }
 
@@ -203,8 +234,6 @@ export default function SupermercadosPage() {
           button.textContent = "Usar mi ubicación actual"
           button.disabled = false
         }
-
-        setError("¡Ubicación obtenida exitosamente!")
       },
       (error) => {
         let errorMessage = "Error obteniendo ubicación: "
@@ -224,7 +253,6 @@ export default function SupermercadosPage() {
         }
 
         setError(errorMessage)
-        setError("Error de geolocalización:", error)
 
         // Restaurar botón
         if (button) {
@@ -236,7 +264,7 @@ export default function SupermercadosPage() {
         enableHighAccuracy: true,
         timeout: 10000,
         maximumAge: 60000,
-      },
+      }
     )
   }
 
@@ -284,6 +312,7 @@ export default function SupermercadosPage() {
                   value={nuevoSupermercado.nombre}
                   onChange={(e) => setNuevoSupermercado({ ...nuevoSupermercado, nombre: e.target.value })}
                   placeholder="Ej: Éxito, Carulla, Jumbo"
+                  required
                 />
               </div>
               <div>
@@ -330,6 +359,9 @@ export default function SupermercadosPage() {
                 Usar mi ubicación actual
               </Button>
             </div>
+            {error && (
+              <div className="p-3 rounded-md text-sm bg-red-100 text-red-700 border border-red-200">{error}</div>
+            )}
             <DialogFooter className="gap-2">
               <Button variant="outline" onClick={cerrarDialogo}>
                 Cancelar
