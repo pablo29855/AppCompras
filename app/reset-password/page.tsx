@@ -25,27 +25,38 @@ export default function ResetPasswordPage() {
   useEffect(() => {
     const handleAuthCallback = async () => {
       try {
+        // Depuración: Imprimir la URL completa y los parámetros
+        const currentUrl = window.location.href;
+        console.log("URL completa:", currentUrl);
+        console.log("Parámetros de búsqueda:", Object.fromEntries(searchParams.entries()));
+
         // Verificar parámetros de error en la URL
         const error = searchParams.get("error");
         const errorCode = searchParams.get("error_code");
         const errorDescription = searchParams.get("error_description");
 
-        if (error && errorCode === "otp_expired") {
-          setMessage("El enlace de restablecimiento ha expirado. Solicita un nuevo enlace.");
+        if (error) {
+          console.error("Error en URL:", { error, errorCode, errorDescription });
+          if (errorCode === "otp_expired") {
+            setMessage("El enlace de restablecimiento ha expirado. Solicita un nuevo enlace.");
+          } else {
+            setMessage(`Error: ${errorDescription || error}`);
+          }
           setIsValidSession(false);
           setCheckingSession(false);
           return;
         }
 
-        const token = searchParams.get("token");
+        // Obtener el token o code
+        const token = searchParams.get("token") || searchParams.get("code");
+        console.log("Token/Code recibido:", token);
+
         if (!token) {
-          setMessage("No se encontró el token de restablecimiento en el enlace. Solicita un nuevo enlace.");
+          setMessage("No se encontró el token o código de restablecimiento en el enlace. Solicita un nuevo enlace.");
           setIsValidSession(false);
           setCheckingSession(false);
           return;
         }
-
-        console.log("Token recibido:", token); // Para depuración
 
         // Cerrar cualquier sesión activa para evitar conflictos
         await supabase.auth.signOut();
@@ -57,16 +68,17 @@ export default function ResetPasswordPage() {
         });
 
         if (verifyError) {
-          console.error("Error al verificar el token:", verifyError.message);
+          console.error("Error al verificar el token:", verifyError);
           if (verifyError.message.includes("Invalid token")) {
             setMessage("El enlace de restablecimiento es inválido o ha expirado. Solicita un nuevo enlace.");
           } else {
-            setMessage(`Error: ${verifyError.message}`);
+            setMessage(`Error al verificar el token: ${verifyError.message}`);
           }
           setIsValidSession(false);
         } else {
           // Verificar si hay una sesión activa después de verificar el OTP
           const { data: { session } } = await supabase.auth.getSession();
+          console.log("Sesión después de verifyOtp:", session);
           if (session) {
             setIsValidSession(true);
             setMessage("");
