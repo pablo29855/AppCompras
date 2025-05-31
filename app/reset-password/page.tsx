@@ -25,10 +25,6 @@ export default function ResetPasswordPage() {
   useEffect(() => {
     const handleAuthCallback = async () => {
       try {
-        const currentUrl = window.location.href;
-        console.log("URL completa:", currentUrl);
-        console.log("Parámetros de búsqueda:", Object.fromEntries(searchParams.entries()));
-
         const error = searchParams.get("error");
         const errorCode = searchParams.get("error_code");
         const errorDescription = searchParams.get("error_description");
@@ -55,22 +51,7 @@ export default function ResetPasswordPage() {
           return;
         }
 
-        await supabase.auth.signOut();
-
-        const { data, error: verifyError } = await supabase.auth.verifyOtp({
-          token,
-          type: "recovery",
-        });
-
-        if (verifyError) {
-          console.error("Error al verificar el token:", verifyError);
-          setMessage(`Error al verificar el token: ${verifyError.message}`);
-          setIsValidSession(false);
-        } else {
-          console.log("Sesión iniciada correctamente:", data?.session);
-          setIsValidSession(true);
-          setMessage("");
-        }
+        setIsValidSession(true);
       } catch (error) {
         console.error("Error inesperado:", error);
         setMessage("Error al procesar el enlace. Solicita un nuevo enlace.");

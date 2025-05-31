@@ -183,14 +183,14 @@ export default function AuthForm() {
         return
       }
 
-      // Simplificar: enviar directamente sin validaciones previas
-      // Supabase manejará internamente si el correo existe o no
-      const resetUrl = getResetPasswordUrl()
-      console.log("Enviando reset a URL:", resetUrl) // Para debug
+      const redirectUrl = `${getResetPasswordUrl()}?email=${encodeURIComponent(resetEmail.toLowerCase().trim())}`
 
-      const { error } = await supabase.auth.resetPasswordForEmail(resetEmail.toLowerCase().trim(), {
-        redirectTo: resetUrl,
-      })
+      const { error } = await supabase.auth.resetPasswordForEmail(
+        resetEmail.toLowerCase().trim(),
+        {
+          redirectTo: redirectUrl,
+        }
+      )
 
       if (error) {
         console.error("Reset password error:", error)
@@ -210,6 +210,7 @@ export default function AuthForm() {
       setLoading(false)
     }
   }
+
 
   const resetResetMode = () => {
     setResetMode(false)
