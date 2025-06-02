@@ -47,16 +47,24 @@ export default function DashboardPage() {
     categoria: "Alimentación",
     precio: "",
     cantidad: "1",
-    fecha: new Date().toISOString().split("T")[0], // Establecer fecha actual por defecto
+    fecha: new Date().toISOString().split("T")[0], // "2025-06-01"
     supermercado_id: null as string | null,
   })
   const [error, setError] = useState("")
 
   const supabase = createClient()
   const fechaActual = new Date()
-  const mesActual = fechaActual.getMonth() + 1
-  const añoActual = fechaActual.getFullYear()
-  const fechaHoy = fechaActual.toISOString().split("T")[0]
+  const mesActual = fechaActual.getMonth() + 1 // 6 (junio)
+  const añoActual = fechaActual.getFullYear() // 2025
+  const fechaHoy = fechaActual.toISOString().split("T")[0] // "2025-06-01"
+
+  // Función para normalizar fechas a YYYY-MM-DD
+  const normalizarFecha = (fecha: string | Date): string => {
+    if (typeof fecha === "string") {
+      return fecha.split("T")[0]
+    }
+    return fecha.toISOString().split("T")[0]
+  }
 
   useEffect(() => {
     cargarDatos()
@@ -72,7 +80,6 @@ export default function DashboardPage() {
         return
       }
 
-      // Cargar compras del mes actual
       const { data: comprasData, error: comprasError } = await supabase
         .from("compras")
         .select(`
@@ -90,7 +97,6 @@ export default function DashboardPage() {
         return
       }
 
-      // Cargar supermercados
       const { data: supermercadosData, error: supermercadosError } = await supabase
         .from("supermercados")
         .select("*")
@@ -104,7 +110,12 @@ export default function DashboardPage() {
       }
 
       console.log("Compras cargadas:", comprasData)
-      setCompras(comprasData || [])
+      // Normalizar las fechas de las compras cargadas
+      const comprasNormalizadas = comprasData?.map(compra => ({
+        ...compra,
+        fecha: normalizarFecha(compra.fecha),
+      })) || []
+      setCompras(comprasNormalizadas)
       setSupermercados(supermercadosData || [])
     } catch (error) {
       console.error("Error cargando datos:", error)
@@ -125,11 +136,11 @@ export default function DashboardPage() {
   // Calcular totales usando precio * cantidad
   const totalMes = compras.reduce((total, compra) => total + compra.precio * compra.cantidad, 0)
   const totalHoy = compras
-    .filter((compra) => compra.fecha === fechaHoy)
+    .filter((compra) => normalizarFecha(compra.fecha) === fechaHoy)
     .reduce((total, compra) => total + compra.precio * compra.cantidad, 0)
 
   const agregarCompra = async () => {
-    setError("") // Limpiar errores previos
+    setError("")
 
     // Validaciones
     if (!nuevaCompra.nombre.trim()) {
@@ -154,11 +165,20 @@ export default function DashboardPage() {
       setError("La fecha es obligatoria")
       return
     }
+
+    // Parsear la fecha asegurándonos de que sea local
     const fechaCompra = new Date(nuevaCompra.fecha)
     if (isNaN(fechaCompra.getTime())) {
       setError("La fecha es inválida")
       return
     }
+
+    // Forzar la fecha a medianoche local para evitar problemas de zona horaria
+    fechaCompra.setHours(0, 0, 0, 0)
+    const mes = fechaCompra.getMonth() + 1
+    const año = fechaCompra.getFullYear()
+
+    console.log("Fecha ingresada:", nuevaCompra.fecha, "Mes calculado:", mes, "Año calculado:", año)
 
     try {
       const {
@@ -175,10 +195,10 @@ export default function DashboardPage() {
         categoria: nuevaCompra.categoria,
         precio,
         cantidad,
-        fecha: nuevaCompra.fecha,
+        fecha: nuevaCompra.fecha, // Guardar como YYYY-MM-DD
         supermercado_id: nuevaCompra.supermercado_id,
-        mes: fechaCompra.getMonth() + 1,
-        año: fechaCompra.getFullYear(),
+        mes,
+        año,
       }
 
       console.log("Insertando compra:", compra)
@@ -198,12 +218,16 @@ export default function DashboardPage() {
         return
       }
 
+      // Normalizar la fecha de la compra devuelta
+      if (data) {
+        data.fecha = normalizarFecha(data.fecha)
+      }
+
       // Solo actualizar la lista si la compra es del mes actual
       if (data && data.mes === mesActual && data.año === añoActual) {
         setCompras([data, ...compras])
       }
 
-      // Limpiar formulario y cerrar diálogo
       setNuevaCompra({
         nombre: "",
         categoria: "Alimentación",
@@ -220,7 +244,7 @@ export default function DashboardPage() {
   }
 
   const editarCompra = async () => {
-    setError("") // Limpiar errores previos
+    setError("")
 
     if (!compraEditando) return
 
@@ -247,11 +271,18 @@ export default function DashboardPage() {
       setError("La fecha es obligatoria")
       return
     }
+
     const fechaCompra = new Date(nuevaCompra.fecha)
     if (isNaN(fechaCompra.getTime())) {
       setError("La fecha es inválida")
       return
     }
+
+    fechaCompra.setHours(0, 0, 0, 0)
+    const mes = fechaCompra.getMonth() + 1
+    const año = fechaCompra.getFullYear()
+
+    console.log("Fecha editada:", nuevaCompra.fecha, "Mes calculado:", mes, "Año calculado:", año)
 
     try {
       const compraActualizada = {
@@ -261,8 +292,8 @@ export default function DashboardPage() {
         cantidad,
         fecha: nuevaCompra.fecha,
         supermercado_id: nuevaCompra.supermercado_id,
-        mes: fechaCompra.getMonth() + 1,
-        año: fechaCompra.getFullYear(),
+        mes,
+        año,
       }
 
       console.log("Actualizando compra:", compraActualizada)
@@ -278,7 +309,6 @@ export default function DashboardPage() {
         return
       }
 
-      // Recargar datos para reflejar cambios
       await cargarDatos()
       cerrarDialogo()
     } catch (error) {
@@ -311,7 +341,7 @@ export default function DashboardPage() {
       categoria: compra.categoria,
       precio: compra.precio.toString(),
       cantidad: compra.cantidad.toString(),
-      fecha: compra.fecha,
+      fecha: normalizarFecha(compra.fecha),
       supermercado_id: compra.supermercado_id || null,
     })
     setDialogoAbierto(true)
@@ -539,7 +569,7 @@ export default function DashboardPage() {
                         onChange={(e) => setNuevaCompra({ ...nuevaCompra, fecha: e.target.value })}
                         className="mt-1"
                         required
-                        max={fechaHoy} // Limitar a fechas no futuras
+                        max={fechaHoy}
                       />
                     </div>
                     <div>
