@@ -5,8 +5,19 @@ import { createClient } from "@/lib/supabase/client"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
-import { Calendar, TrendingUp, TrendingDown, Minus } from "lucide-react"
-import type { Compra } from "@/types/database"
+import { Calendar, TrendingUp, TrendingDown, Minus, Edit3, Trash2 } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import type { Compra, Supermercado } from "@/types/database"
 
 interface ResumenMes {
   mes: number
@@ -31,11 +42,25 @@ const meses = [
   "Diciembre",
 ]
 
+const categorias = ["Alimentación", "Transporte", "Entretenimiento", "Salud", "Ropa", "Hogar", "Tecnología", "Otros"]
+
 export default function MesesPage() {
   const [resumenMeses, setResumenMeses] = useState<ResumenMes[]>([])
   const [comprasDetalle, setComprasDetalle] = useState<Compra[]>([])
+  const [supermercados, setSupermercados] = useState<Supermercado[]>([])
   const [mesSeleccionado, setMesSeleccionado] = useState("")
   const [loading, setLoading] = useState(true)
+  const [dialogoAbierto, setDialogoAbierto] = useState(false)
+  const [compraEditando, setCompraEditando] = useState<Compra | null>(null)
+  const [nuevaCompra, setNuevaCompra] = useState({
+    nombre: "",
+    categoria: "Alimentación",
+    precio: "",
+    cantidad: "1",
+    fecha: "",
+    supermercado_id: null as string | null,
+  })
+  const [error, setError] = useState("")
 
   const supabase = createClient()
 
@@ -63,6 +88,12 @@ export default function MesesPage() {
         .order("año", { ascending: false })
         .order("mes", { ascending: false })
 
+      const { data: supermercadosData } = await supabase
+        .from("supermercados")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("nombre")
+
       if (comprasData) {
         const resumen = comprasData.reduce((acc: { [key: string]: ResumenMes }, compra) => {
           const key = `${compra.año}-${compra.mes}`
@@ -75,7 +106,7 @@ export default function MesesPage() {
               promedio: 0,
             }
           }
-          acc[key].total += compra.precio
+          acc[key].total += compra.precio * compra.cantidad
           acc[key].compras += 1
           return acc
         }, {})
@@ -87,6 +118,7 @@ export default function MesesPage() {
 
         setResumenMeses(resumenArray)
       }
+      setSupermercados(supermercadosData || [])
     } catch (error) {
       console.error("Error cargando resumen de meses:", error)
     } finally {
@@ -113,10 +145,135 @@ export default function MesesPage() {
         .eq("año", Number.parseInt(año))
         .order("fecha", { ascending: false })
 
-      setComprasDetalle(comprasData || [])
+      setComprasDetalle(comprasData?.map(compra => ({
+        ...compra,
+        fecha: normalizarFecha(compra.fecha),
+      })) || [])
     } catch (error) {
       console.error("Error cargando detalles del mes:", error)
     }
+  }
+
+  const normalizarFecha = (fecha: string | Date): string => {
+    if (typeof fecha === "string") {
+      return fecha.split("T")[0]
+    }
+    return fecha.toISOString().split("T")[0]
+  }
+
+  const parsearFechaLocal = (fechaStr: string): Date => {
+    const [año, mes, dia] = fechaStr.split("-").map(Number)
+    return new Date(año, mes - 1, dia)
+  }
+
+  const editarCompra = async () => {
+    setError("")
+    if (!compraEditando) return
+
+    if (!nuevaCompra.nombre.trim()) {
+      setError("El nombre de la compra es obligatorio")
+      return
+    }
+    if (!nuevaCompra.categoria) {
+      setError("La categoría es obligatoria")
+      return
+    }
+    const precio = Number.parseFloat(nuevaCompra.precio)
+    if (isNaN(precio) || precio <= 0) {
+      setError("El precio debe ser mayor a 0")
+      return
+    }
+    const cantidad = Number.parseInt(nuevaCompra.cantidad)
+    if (isNaN(cantidad) || cantidad <= 0) {
+      setError("La cantidad debe ser mayor a 0")
+      return
+    }
+    if (!nuevaCompra.fecha) {
+      setError("La fecha es obligatoria")
+      return
+    }
+
+    const fechaCompra = parsearFechaLocal(nuevaCompra.fecha)
+    if (isNaN(fechaCompra.getTime())) {
+      setError("La fecha es inválida")
+      return
+    }
+
+    const mes = fechaCompra.getMonth() + 1
+    const año = fechaCompra.getFullYear()
+
+    try {
+      const compraActualizada = {
+        nombre: nuevaCompra.nombre.trim(),
+        categoria: nuevaCompra.categoria,
+        precio,
+        cantidad,
+        fecha: nuevaCompra.fecha,
+        supermercado_id: nuevaCompra.supermercado_id,
+        mes,
+        año,
+      }
+
+      const { error: supabaseError } = await supabase
+        .from("compras")
+        .update(compraActualizada)
+        .eq("id", compraEditando.id)
+
+      if (supabaseError) {
+        setError(`Error al guardar: ${supabaseError.message}`)
+        return
+      }
+
+      await cargarDetallesMes(mesSeleccionado)
+      await cargarResumenMeses()
+      cerrarDialogo()
+    } catch (error) {
+      setError("Error inesperado al editar la compra")
+    }
+  }
+
+  const eliminarCompra = async (id: string) => {
+    try {
+      const { error: supabaseError } = await supabase.from("compras").delete().eq("id", id)
+
+      if (supabaseError) {
+        setError(`Error al eliminar: ${supabaseError.message}`)
+        return
+      }
+
+      setComprasDetalle(comprasDetalle.filter((compra) => compra.id !== id))
+      await cargarResumenMeses()
+    } catch (error) {
+      setError("Error inesperado al eliminar la compra")
+    }
+  }
+
+  const abrirDialogoEdicion = (compra: Compra) => {
+    setCompraEditando(compra)
+    setNuevaCompra({
+      nombre: compra.nombre,
+      categoria: compra.categoria,
+      precio: compra.precio.toString(),
+      cantidad: compra.cantidad.toString(),
+      fecha: normalizarFecha(compra.fecha),
+      supermercado_id: compra.supermercado_id || null,
+    })
+    setDialogoAbierto(true)
+    setError("")
+  }
+
+  const cerrarDialogo = () => {
+    setDialogoAbierto(false)
+    setCompraEditando(null)
+    setError("")
+    setNuevaCompra({
+      nombre: "",
+      categoria: "Alimentación",
+      precio: "",
+      cantidad: "1",
+      fecha: "",
+      supermercado_id: null,
+    })
   }
 
   const obtenerTendencia = (index: number) => {
@@ -247,11 +404,24 @@ export default function MesesPage() {
                           {compra.supermercado?.nombre || "Sin especificar"}
                         </div>
                       </div>
-                      <div className="text-right">
-                        <div className="font-semibold">${compra.precio.toLocaleString("es-CO")} COP</div>
-                        <Badge variant="secondary" className="text-xs">
-                          {compra.categoria}
-                        </Badge>
+                      <div className="flex items-center gap-2">
+                        <div className="text-right">
+                          <div className="font-semibold">${(compra.precio * compra.cantidad).toLocaleString("es-CO")} COP</div>
+                          <Badge variant="secondary" className="text-xs">
+                            {compra.categoria}
+                          </Badge>
+                        </div>
+                        <Button variant="outline" size="sm" onClick={() => abrirDialogoEdicion(compra)}>
+                          <Edit3 className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => eliminarCompra(compra.id)}
+                          className="text-red-600 hover:text-red-700"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       </div>
                     </div>
                   ))}
@@ -259,6 +429,147 @@ export default function MesesPage() {
               </CardContent>
             </Card>
           )}
+
+          {/* Diálogo de Edición */}
+          <Dialog open={dialogoAbierto} onOpenChange={setDialogoAbierto}>
+            <DialogContent className="w-[95vw] max-w-md mx-auto">
+              <DialogHeader>
+                <DialogTitle className="text-lg">Editar Compra</DialogTitle>
+                <DialogDescription className="text-sm">Modifica los datos de la compra</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 max-h-[60vh] overflow-y-auto">
+                <div>
+                  <Label htmlFor="nombre" className="text-sm font-medium">
+                    Nombre de la compra
+                  </Label>
+                  <Input
+                    id="nombre"
+                    value={nuevaCompra.nombre}
+                    onChange={(e) => setNuevaCompra({ ...nuevaCompra, nombre: e.target.value })}
+                    placeholder="Ej: Pan integral"
+                    className="mt-1"
+                    required
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="categoria" className="text-sm font-medium">
+                    Categoría
+                  </Label>
+                  <Select
+                    value={nuevaCompra.categoria}
+                    onValueChange={(value) => setNuevaCompra({ ...nuevaCompra, categoria: value })}
+                  >
+                    <SelectTrigger className="mt-1">
+                      <SelectValue placeholder="Selecciona una categoría" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {categorias.map((categoria) => (
+                        <SelectItem key={categoria} value={categoria}>
+                          {categoria}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label htmlFor="precio" className="text-sm font-medium">
+                      Precio Unit. (COP)
+                    </Label>
+                    <Input
+                      id="precio"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={nuevaCompra.precio}
+                      onChange={(e) => setNuevaCompra({ ...nuevaCompra, precio: e.target.value })}
+                      placeholder="1000"
+                      className="mt-1"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="cantidad" className="text-sm font-medium">
+                      Cantidad
+                    </Label>
+                    <Input
+                      id="cantidad"
+                      type="number"
+                      min="1"
+                      step="1"
+                      value={nuevaCompra.cantidad}
+                      onChange={(e) => setNuevaCompra({ ...nuevaCompra, cantidad: e.target.value })}
+                      placeholder="1"
+                      className="mt-1"
+                      required
+                    />
+                  </div>
+                </div>
+                {nuevaCompra.precio && nuevaCompra.cantidad && (
+                  <div className="p-3 bg-gray-50 rounded-lg">
+                    <div className="text-sm text-gray-600">Total de esta compra:</div>
+                    <div className="text-lg font-bold text-green-600">
+                      $
+                      {(
+                        Number.parseFloat(nuevaCompra.precio || "0") * Number.parseInt(nuevaCompra.cantidad || "1")
+                      ).toLocaleString("es-CO")}{" "}
+                      COP
+                    </div>
+                  </div>
+                )}
+                <div>
+                  <Label htmlFor="fecha" className="text-sm font-medium">
+                    Fecha
+                  </Label>
+                  <Input
+                    id="fecha"
+                    type="date"
+                    value={nuevaCompra.fecha}
+                    onChange={(e) => setNuevaCompra({ ...nuevaCompra, fecha: e.target.value })}
+                    className="mt-1"
+                    required
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="supermercado" className="text-sm font-medium">
+                    Supermercado (opcional)
+                  </Label>
+                  <Select
+                    value={nuevaCompra.supermercado_id || "sin_supermercado"}
+                    onValueChange={(value) =>
+                      setNuevaCompra({
+                        ...nuevaCompra,
+                        supermercado_id: value === "sin_supermercado" ? null : value,
+                      })
+                    }
+                  >
+                    <SelectTrigger className="mt-1">
+                      <SelectValue placeholder="Selecciona un supermercado" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="sin_supermercado">Sin supermercado</SelectItem>
+                      {supermercados.map((supermercado) => (
+                        <SelectItem key={supermercado.id} value={supermercado.id}>
+                          {supermercado.nombre}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              {error && (
+                <div className="p-3 rounded-md text-sm bg-red-100 text-red-700 border border-red-200">{error}</div>
+              )}
+              <DialogFooter className="flex-col sm:flex-row gap-2">
+                <Button variant="outline" onClick={cerrarDialogo} className="w-full sm:w-auto">
+                  Cancelar
+                </Button>
+                <Button onClick={editarCompra} className="w-full sm:w-auto">
+                  Guardar Cambios
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </>
       )}
     </div>
