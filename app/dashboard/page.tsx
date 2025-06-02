@@ -66,6 +66,15 @@ export default function DashboardPage() {
     return fecha.toISOString().split("T")[0]
   }
 
+  // Función para parsear fecha manualmente y evitar problemas de zona horaria
+  const parsearFechaLocal = (fechaStr: string): Date => {
+    const [año, mes, dia] = fechaStr.split("-").map(Number)
+    // Crear la fecha en la zona horaria local sin ajuste de UTC
+    const fecha = new Date(año, mes - 1, dia)
+    console.log("Fecha parseada manualmente:", fechaStr, "Resultado:", fecha.toString())
+    return fecha
+  }
+
   useEffect(() => {
     cargarDatos()
   }, [])
@@ -110,7 +119,6 @@ export default function DashboardPage() {
       }
 
       console.log("Compras cargadas:", comprasData)
-      // Normalizar las fechas de las compras cargadas
       const comprasNormalizadas = comprasData?.map(compra => ({
         ...compra,
         fecha: normalizarFecha(compra.fecha),
@@ -133,7 +141,6 @@ export default function DashboardPage() {
     return coincideBusqueda && coincideCategoria
   })
 
-  // Calcular totales usando precio * cantidad
   const totalMes = compras.reduce((total, compra) => total + compra.precio * compra.cantidad, 0)
   const totalHoy = compras
     .filter((compra) => normalizarFecha(compra.fecha) === fechaHoy)
@@ -142,7 +149,6 @@ export default function DashboardPage() {
   const agregarCompra = async () => {
     setError("")
 
-    // Validaciones
     if (!nuevaCompra.nombre.trim()) {
       setError("El nombre de la compra es obligatorio")
       return
@@ -166,15 +172,13 @@ export default function DashboardPage() {
       return
     }
 
-    // Parsear la fecha asegurándonos de que sea local
-    const fechaCompra = new Date(nuevaCompra.fecha)
+    // Parsear la fecha manualmente para evitar problemas de zona horaria
+    const fechaCompra = parsearFechaLocal(nuevaCompra.fecha)
     if (isNaN(fechaCompra.getTime())) {
       setError("La fecha es inválida")
       return
     }
 
-    // Forzar la fecha a medianoche local para evitar problemas de zona horaria
-    fechaCompra.setHours(0, 0, 0, 0)
     const mes = fechaCompra.getMonth() + 1
     const año = fechaCompra.getFullYear()
 
@@ -195,7 +199,7 @@ export default function DashboardPage() {
         categoria: nuevaCompra.categoria,
         precio,
         cantidad,
-        fecha: nuevaCompra.fecha, // Guardar como YYYY-MM-DD
+        fecha: nuevaCompra.fecha,
         supermercado_id: nuevaCompra.supermercado_id,
         mes,
         año,
@@ -218,12 +222,10 @@ export default function DashboardPage() {
         return
       }
 
-      // Normalizar la fecha de la compra devuelta
       if (data) {
         data.fecha = normalizarFecha(data.fecha)
       }
 
-      // Solo actualizar la lista si la compra es del mes actual
       if (data && data.mes === mesActual && data.año === añoActual) {
         setCompras([data, ...compras])
       }
@@ -248,7 +250,6 @@ export default function DashboardPage() {
 
     if (!compraEditando) return
 
-    // Validaciones
     if (!nuevaCompra.nombre.trim()) {
       setError("El nombre de la compra es obligatorio")
       return
@@ -272,13 +273,12 @@ export default function DashboardPage() {
       return
     }
 
-    const fechaCompra = new Date(nuevaCompra.fecha)
+    const fechaCompra = parsearFechaLocal(nuevaCompra.fecha)
     if (isNaN(fechaCompra.getTime())) {
       setError("La fecha es inválida")
       return
     }
 
-    fechaCompra.setHours(0, 0, 0, 0)
     const mes = fechaCompra.getMonth() + 1
     const año = fechaCompra.getFullYear()
 
@@ -372,7 +372,6 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-4 sm:space-y-6 p-2 sm:p-0">
-      {/* Header */}
       <div className="text-center space-y-2">
         <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
           Compras de {new Date().toLocaleDateString("es-CO", { month: "long", year: "numeric" })}
@@ -380,7 +379,6 @@ export default function DashboardPage() {
         <p className="text-sm sm:text-base text-gray-600">Controla y organiza todos tus gastos del mes</p>
       </div>
 
-      {/* Resumen */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <Card>
           <CardHeader className="pb-2">
@@ -428,7 +426,6 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      {/* Controles */}
       <Card>
         <CardHeader>
           <CardTitle className="text-lg sm:text-xl">Filtros y Acciones</CardTitle>
@@ -617,7 +614,6 @@ export default function DashboardPage() {
         </CardContent>
       </Card>
 
-      {/* Lista de Compras */}
       <Card>
         <CardHeader>
           <CardTitle className="text-lg sm:text-xl">Lista de Compras</CardTitle>
@@ -635,7 +631,6 @@ export default function DashboardPage() {
             </div>
           ) : (
             <>
-              {/* Vista móvil - Cards */}
               <div className="block sm:hidden space-y-3">
                 {comprasFiltradas.map((compra) => (
                   <Card key={compra.id} className="p-4">
@@ -693,7 +688,6 @@ export default function DashboardPage() {
                 ))}
               </div>
 
-              {/* Vista desktop - Tabla */}
               <div className="hidden sm:block overflow-x-auto">
                 <Table>
                   <TableHeader>
