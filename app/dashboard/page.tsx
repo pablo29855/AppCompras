@@ -47,8 +47,8 @@ export default function DashboardPage() {
     categoria: "Alimentación",
     precio: "",
     cantidad: "1",
-    fecha: "",
-    supermercado_id: null,
+    fecha: new Date().toISOString().split("T")[0], // Establecer fecha actual por defecto
+    supermercado_id: null as string | null,
   })
   const [error, setError] = useState("")
 
@@ -67,10 +67,13 @@ export default function DashboardPage() {
       const {
         data: { user },
       } = await supabase.auth.getUser()
-      if (!user) return
+      if (!user) {
+        setError("Usuario no autenticado")
+        return
+      }
 
       // Cargar compras del mes actual
-      const { data: comprasData } = await supabase
+      const { data: comprasData, error: comprasError } = await supabase
         .from("compras")
         .select(`
           *,
@@ -81,17 +84,31 @@ export default function DashboardPage() {
         .eq("año", añoActual)
         .order("fecha", { ascending: false })
 
+      if (comprasError) {
+        console.error("Error al cargar compras:", comprasError)
+        setError("Error al cargar las compras")
+        return
+      }
+
       // Cargar supermercados
-      const { data: supermercadosData } = await supabase
+      const { data: supermercadosData, error: supermercadosError } = await supabase
         .from("supermercados")
         .select("*")
         .eq("user_id", user.id)
         .order("nombre")
 
+      if (supermercadosError) {
+        console.error("Error al cargar supermercados:", supermercadosError)
+        setError("Error al cargar los supermercados")
+        return
+      }
+
+      console.log("Compras cargadas:", comprasData)
       setCompras(comprasData || [])
       setSupermercados(supermercadosData || [])
     } catch (error) {
       console.error("Error cargando datos:", error)
+      setError("Error inesperado al cargar los datos")
     } finally {
       setLoading(false)
     }
@@ -114,7 +131,7 @@ export default function DashboardPage() {
   const agregarCompra = async () => {
     setError("") // Limpiar errores previos
 
-    // Validaciones más específicas con mensajes de error
+    // Validaciones
     if (!nuevaCompra.nombre.trim()) {
       setError("El nombre de la compra es obligatorio")
       return
@@ -123,16 +140,23 @@ export default function DashboardPage() {
       setError("La categoría es obligatoria")
       return
     }
-    if (!nuevaCompra.precio || Number.parseFloat(nuevaCompra.precio) <= 0) {
+    const precio = Number.parseFloat(nuevaCompra.precio)
+    if (isNaN(precio) || precio <= 0) {
       setError("El precio debe ser mayor a 0")
       return
     }
-    if (!nuevaCompra.cantidad || Number.parseInt(nuevaCompra.cantidad) <= 0) {
+    const cantidad = Number.parseInt(nuevaCompra.cantidad)
+    if (isNaN(cantidad) || cantidad <= 0) {
       setError("La cantidad debe ser mayor a 0")
       return
     }
     if (!nuevaCompra.fecha) {
       setError("La fecha es obligatoria")
+      return
+    }
+    const fechaCompra = new Date(nuevaCompra.fecha)
+    if (isNaN(fechaCompra.getTime())) {
+      setError("La fecha es inválida")
       return
     }
 
@@ -145,44 +169,47 @@ export default function DashboardPage() {
         return
       }
 
-      const fechaCompra = new Date(nuevaCompra.fecha)
       const compra = {
         user_id: user.id,
         nombre: nuevaCompra.nombre.trim(),
         categoria: nuevaCompra.categoria,
-        precio: Number.parseFloat(nuevaCompra.precio),
-        cantidad: Number.parseInt(nuevaCompra.cantidad),
+        precio,
+        cantidad,
         fecha: nuevaCompra.fecha,
         supermercado_id: nuevaCompra.supermercado_id,
         mes: fechaCompra.getMonth() + 1,
         año: fechaCompra.getFullYear(),
       }
 
-      const { data, error } = await supabase
+      console.log("Insertando compra:", compra)
+
+      const { data, error: supabaseError } = await supabase
         .from("compras")
         .insert(compra)
         .select(`
           *,
           supermercado:supermercados(*)
         `)
+        .single()
 
-      if (error) {
-        console.error("Error de Supabase:", error)
-        setError(`Error al guardar: ${error.message}`)
+      if (supabaseError) {
+        console.error("Error de Supabase al insertar:", supabaseError)
+        setError(`Error al guardar: ${supabaseError.message}`)
         return
       }
 
-      if (data && data[0]) {
-        const nuevasCompras = [data[0], ...compras]
-        setCompras(nuevasCompras)
+      // Solo actualizar la lista si la compra es del mes actual
+      if (data && data.mes === mesActual && data.año === añoActual) {
+        setCompras([data, ...compras])
       }
 
+      // Limpiar formulario y cerrar diálogo
       setNuevaCompra({
         nombre: "",
         categoria: "Alimentación",
         precio: "",
         cantidad: "1",
-        fecha: "",
+        fecha: fechaHoy,
         supermercado_id: null,
       })
       setDialogoAbierto(false)
@@ -193,57 +220,87 @@ export default function DashboardPage() {
   }
 
   const editarCompra = async () => {
-    if (
-      compraEditando &&
-      nuevaCompra.nombre &&
-      nuevaCompra.categoria &&
-      nuevaCompra.precio &&
-      nuevaCompra.cantidad &&
-      nuevaCompra.fecha
-    ) {
-      try {
-        const fechaCompra = new Date(nuevaCompra.fecha)
-        const compraActualizada = {
-          nombre: nuevaCompra.nombre,
-          categoria: nuevaCompra.categoria,
-          precio: Number.parseFloat(nuevaCompra.precio),
-          cantidad: Number.parseInt(nuevaCompra.cantidad),
-          fecha: nuevaCompra.fecha,
-          supermercado_id: nuevaCompra.supermercado_id,
-          mes: fechaCompra.getMonth() + 1,
-          año: fechaCompra.getFullYear(),
-        }
+    setError("") // Limpiar errores previos
 
-        const { error } = await supabase.from("compras").update(compraActualizada).eq("id", compraEditando.id)
+    if (!compraEditando) return
 
-        if (error) throw error
+    // Validaciones
+    if (!nuevaCompra.nombre.trim()) {
+      setError("El nombre de la compra es obligatorio")
+      return
+    }
+    if (!nuevaCompra.categoria) {
+      setError("La categoría es obligatoria")
+      return
+    }
+    const precio = Number.parseFloat(nuevaCompra.precio)
+    if (isNaN(precio) || precio <= 0) {
+      setError("El precio debe ser mayor a 0")
+      return
+    }
+    const cantidad = Number.parseInt(nuevaCompra.cantidad)
+    if (isNaN(cantidad) || cantidad <= 0) {
+      setError("La cantidad debe ser mayor a 0")
+      return
+    }
+    if (!nuevaCompra.fecha) {
+      setError("La fecha es obligatoria")
+      return
+    }
+    const fechaCompra = new Date(nuevaCompra.fecha)
+    if (isNaN(fechaCompra.getTime())) {
+      setError("La fecha es inválida")
+      return
+    }
 
-        await cargarDatos()
-        setCompraEditando(null)
-        setNuevaCompra({
-          nombre: "",
-          categoria: "Alimentación",
-          precio: "",
-          cantidad: "1",
-          fecha: "",
-          supermercado_id: null,
-        })
-        setDialogoAbierto(false)
-      } catch (error) {
-        console.error("Error editando compra:", error)
+    try {
+      const compraActualizada = {
+        nombre: nuevaCompra.nombre.trim(),
+        categoria: nuevaCompra.categoria,
+        precio,
+        cantidad,
+        fecha: nuevaCompra.fecha,
+        supermercado_id: nuevaCompra.supermercado_id,
+        mes: fechaCompra.getMonth() + 1,
+        año: fechaCompra.getFullYear(),
       }
+
+      console.log("Actualizando compra:", compraActualizada)
+
+      const { error: supabaseError } = await supabase
+        .from("compras")
+        .update(compraActualizada)
+        .eq("id", compraEditando.id)
+
+      if (supabaseError) {
+        console.error("Error de Supabase al actualizar:", supabaseError)
+        setError(`Error al guardar: ${supabaseError.message}`)
+        return
+      }
+
+      // Recargar datos para reflejar cambios
+      await cargarDatos()
+      cerrarDialogo()
+    } catch (error) {
+      console.error("Error editando compra:", error)
+      setError("Error inesperado al editar la compra")
     }
   }
 
   const eliminarCompra = async (id: string) => {
     try {
-      const { error } = await supabase.from("compras").delete().eq("id", id)
+      const { error: supabaseError } = await supabase.from("compras").delete().eq("id", id)
 
-      if (error) throw error
+      if (supabaseError) {
+        console.error("Error de Supabase al eliminar:", supabaseError)
+        setError(`Error al eliminar: ${supabaseError.message}`)
+        return
+      }
 
       setCompras(compras.filter((compra) => compra.id !== id))
     } catch (error) {
       console.error("Error eliminando compra:", error)
+      setError("Error inesperado al eliminar la compra")
     }
   }
 
@@ -258,18 +315,19 @@ export default function DashboardPage() {
       supermercado_id: compra.supermercado_id || null,
     })
     setDialogoAbierto(true)
+    setError("")
   }
 
   const cerrarDialogo = () => {
     setDialogoAbierto(false)
     setCompraEditando(null)
-    setError("") // Limpiar errores
+    setError("")
     setNuevaCompra({
       nombre: "",
       categoria: "Alimentación",
       precio: "",
       cantidad: "1",
-      fecha: "",
+      fecha: fechaHoy,
       supermercado_id: null,
     })
   }
@@ -401,6 +459,7 @@ export default function DashboardPage() {
                         onChange={(e) => setNuevaCompra({ ...nuevaCompra, nombre: e.target.value })}
                         placeholder="Ej: Pan integral"
                         className="mt-1"
+                        required
                       />
                     </div>
                     <div>
@@ -431,11 +490,13 @@ export default function DashboardPage() {
                         <Input
                           id="precio"
                           type="number"
-                          step="1"
+                          step="0.01"
+                          min="0"
                           value={nuevaCompra.precio}
                           onChange={(e) => setNuevaCompra({ ...nuevaCompra, precio: e.target.value })}
                           placeholder="1000"
                           className="mt-1"
+                          required
                         />
                       </div>
                       <div>
@@ -451,6 +512,7 @@ export default function DashboardPage() {
                           onChange={(e) => setNuevaCompra({ ...nuevaCompra, cantidad: e.target.value })}
                           placeholder="1"
                           className="mt-1"
+                          required
                         />
                       </div>
                     </div>
@@ -476,6 +538,8 @@ export default function DashboardPage() {
                         value={nuevaCompra.fecha}
                         onChange={(e) => setNuevaCompra({ ...nuevaCompra, fecha: e.target.value })}
                         className="mt-1"
+                        required
+                        max={fechaHoy} // Limitar a fechas no futuras
                       />
                     </div>
                     <div>
