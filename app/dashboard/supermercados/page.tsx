@@ -201,6 +201,13 @@ export default function SupermercadosPage() {
     setError("") // Limpiar errores al abrir el diálogo
   }
 
+  const abrirDialogoNuevo = () => {
+    setSupermercadoEditando(null) // Aseguramos que estamos en modo "agregar"
+    setNuevoSupermercado({ nombre: "", direccion: "", latitud: "", longitud: "" }) // Limpiamos el formulario
+    setDialogoAbierto(true)
+    setError("") // Limpiar errores al abrir el diálogo
+  }
+
   const cerrarDialogo = () => {
     setDialogoAbierto(false)
     setSupermercadoEditando(null)
@@ -290,7 +297,7 @@ export default function SupermercadosPage() {
       <div className="flex justify-end">
         <Dialog open={dialogoAbierto} onOpenChange={setDialogoAbierto}>
           <DialogTrigger asChild>
-            <Button onClick={() => setDialogoAbierto(true)}>
+            <Button onClick={abrirDialogoNuevo}>
               <Plus className="h-4 w-4 mr-2" />
               Nuevo Supermercado
             </Button>
