@@ -70,7 +70,7 @@ export default function DashboardPage() {
   const parsearFechaLocal = (fechaStr: string): Date => {
     const [año, mes, dia] = fechaStr.split("-").map(Number)
     // Crear la fecha en la zona horaria local sin ajuste de UTC
-    const fecha = new Date(año, mes - 1, dia)
+    const fecha = new Date(año, mes, dia)
     console.log("Fecha parseada manualmente:", fechaStr, "Resultado:", fecha.toString())
     return fecha
   }

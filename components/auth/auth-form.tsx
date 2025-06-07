@@ -18,7 +18,7 @@ export default function AuthForm() {
   const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState("")
-  const [messageType, setMessageType] = useState<"success" | "error" | "">("") // Nuevo estado para el tipo de mensaje
+  const [messageType, setMessageType] = useState<"success" | "error" | "">("")
   const router = useRouter()
   const supabase = createClient()
 
@@ -48,6 +48,27 @@ export default function AuthForm() {
         return
       }
 
+      // Verificar si el correo ya está registrado
+      const { data: existingUser, error: checkError } = await supabase
+        .from("auth.users")
+        .select("email")
+        .eq("email", email.toLowerCase().trim())
+        .single()
+
+      if (checkError && checkError.code !== "PGRST116") { // PGRST116 indica no encontrado
+        setMessage("Error al verificar el correo.")
+        setMessageType("error")
+        setLoading(false)
+        return
+      }
+
+      if (existingUser) {
+        setMessage("Este correo electrónico ya está registrado. Intenta iniciar sesión.")
+        setMessageType("error")
+        setLoading(false)
+        return
+      }
+
       // Intentar registrar el usuario directamente sin requerir confirmación de correo
       const { data, error } = await supabase.auth.signUp({
         email: email.toLowerCase().trim(),
@@ -61,14 +82,8 @@ export default function AuthForm() {
       })
 
       if (error) {
-        console.error("Signup error:", error)
-
         // Manejar diferentes tipos de errores de Supabase
-        if (
-          error.message.includes("already registered") ||
-          error.message.includes("already exists") ||
-          error.message.includes("User already registered")
-        ) {
+        if (error.message.includes("already registered") || error.message.includes("already exists")) {
           setMessage("Este correo electrónico ya está registrado. Intenta iniciar sesión.")
           setMessageType("error")
         } else if (error.message.includes("Invalid email")) {
@@ -86,50 +101,30 @@ export default function AuthForm() {
         }
       } else if (data.user) {
         // Crear perfil de usuario
-        try {
-          const { error: profileError } = await supabase.from("user_profiles").insert({
+        const { error: profileError } = await supabase
+          .from("user_profiles")
+          .insert({
             id: data.user.id,
             email: data.user.email?.toLowerCase(),
           })
+          .select()
 
-          if (profileError) {
-            console.error("Error creando perfil:", profileError)
-          }
-        } catch (profileError) {
-          console.error("Error en creación de perfil:", profileError)
-        }
-
-        if (data.session) {
-          // Usuario logueado automáticamente
+        if (profileError) {
+          // Si falla crear el perfil, no bloqueamos el flujo, solo logueamos
+          setMessage("Cuenta creada, pero hubo un error al guardar el perfil.")
+          setMessageType("error")
+        } else {
           setMessage("Cuenta creada exitosamente. Iniciando sesión...")
           setMessageType("success")
           setTimeout(() => {
             router.push("/dashboard")
           }, 1500) // Retraso para mostrar el mensaje
-        } else {
-          // Iniciar sesión automáticamente después del registro
-          const { error: signInError } = await supabase.auth.signInWithPassword({
-            email: email.toLowerCase().trim(),
-            password,
-          })
-
-          if (signInError) {
-            setMessage("Cuenta creada. Por favor inicia sesión.")
-            setMessageType("success")
-          } else {
-            setMessage("Cuenta creada exitosamente. Iniciando sesión...")
-            setMessageType("success")
-            setTimeout(() => {
-              router.push("/dashboard")
-            }, 1500) // Retraso para mostrar el mensaje
-          }
         }
       } else {
         setMessage("Error inesperado al crear la cuenta. Intenta nuevamente.")
         setMessageType("error")
       }
     } catch (error) {
-      console.error("Error en registro:", error)
       setMessage("Error al crear la cuenta. Intenta nuevamente.")
       setMessageType("error")
     } finally {
@@ -157,8 +152,6 @@ export default function AuthForm() {
       })
 
       if (error) {
-        console.error("Signin error:", error)
-
         if (error.message.includes("Invalid login credentials")) {
           setMessage("Credenciales incorrectas. Verifica tu email y contraseña.")
           setMessageType("error")
@@ -174,10 +167,13 @@ export default function AuthForm() {
         }
       } else if (data.session) {
         // Verificar/crear perfil de usuario si no existe
-        const { data: profile } = await supabase.from("user_profiles").select("id").eq("id", data.user.id).single()
+        const { data: profile } = await supabase
+          .from("user_profiles")
+          .select("id")
+          .eq("id", data.user.id)
+          .single()
 
         if (!profile) {
-          // Crear perfil si no existe
           await supabase.from("user_profiles").insert({
             id: data.user.id,
             email: data.user.email?.toLowerCase(),
@@ -190,7 +186,6 @@ export default function AuthForm() {
         setMessageType("error")
       }
     } catch (error) {
-      console.error("Error en inicio de sesión:", error)
       setMessage("Error al iniciar sesión. Intenta nuevamente.")
       setMessageType("error")
     } finally {
@@ -214,15 +209,11 @@ export default function AuthForm() {
 
       const redirectUrl = `${getResetPasswordUrl()}?email=${encodeURIComponent(resetEmail.toLowerCase().trim())}`
 
-      const { error } = await supabase.auth.resetPasswordForEmail(
-        resetEmail.toLowerCase().trim(),
-        {
-          redirectTo: redirectUrl,
-        }
-      )
+      const { error } = await supabase.auth.resetPasswordForEmail(resetEmail.toLowerCase().trim(), {
+        redirectTo: redirectUrl,
+      })
 
       if (error) {
-        console.error("Reset password error:", error)
         if (error.message.includes("rate limit")) {
           setMessage("Demasiados intentos. Espera unos minutos antes de solicitar otro enlace.")
           setMessageType("error")
@@ -236,7 +227,6 @@ export default function AuthForm() {
         setMessageType("success")
       }
     } catch (error) {
-      console.error("Error enviando enlace:", error)
       setMessage("Error al enviar el enlace de restablecimiento. Intenta nuevamente.")
       setMessageType("error")
     } finally {
