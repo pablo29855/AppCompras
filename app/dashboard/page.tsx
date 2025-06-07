@@ -47,7 +47,7 @@ export default function DashboardPage() {
     categoria: "Alimentación",
     precio: "",
     cantidad: "1",
-    fecha: new Date().toISOString().split("T")[0], // "2025-06-01"
+    fecha: new Date().toISOString().split("T")[0], // "2025-06-06"
     supermercado_id: null as string | null,
   })
   const [error, setError] = useState("")
@@ -56,7 +56,7 @@ export default function DashboardPage() {
   const fechaActual = new Date()
   const mesActual = fechaActual.getMonth() + 1 // 6 (junio)
   const añoActual = fechaActual.getFullYear() // 2025
-  const fechaHoy = fechaActual.toISOString().split("T")[0] // "2025-06-01"
+  const fechaHoy = fechaActual.toISOString().split("T")[0] // "2025-06-06"
 
   // Función para normalizar fechas a YYYY-MM-DD
   const normalizarFecha = (fecha: string | Date): string => {
@@ -64,15 +64,6 @@ export default function DashboardPage() {
       return fecha.split("T")[0]
     }
     return fecha.toISOString().split("T")[0]
-  }
-
-  // Función para parsear fecha manualmente y evitar problemas de zona horaria
-  const parsearFechaLocal = (fechaStr: string): Date => {
-    const [año, mes, dia] = fechaStr.split("-").map(Number)
-    // Crear la fecha en la zona horaria local sin ajuste de UTC
-    const fecha = new Date(año, mes, dia)
-    console.log("Fecha parseada manualmente:", fechaStr, "Resultado:", fecha.toString())
-    return fecha
   }
 
   useEffect(() => {
@@ -101,7 +92,6 @@ export default function DashboardPage() {
         .order("fecha", { ascending: false })
 
       if (comprasError) {
-        console.error("Error al cargar compras:", comprasError)
         setError("Error al cargar las compras")
         return
       }
@@ -113,20 +103,17 @@ export default function DashboardPage() {
         .order("nombre")
 
       if (supermercadosError) {
-        console.error("Error al cargar supermercados:", supermercadosError)
         setError("Error al cargar los supermercados")
         return
       }
 
-      console.log("Compras cargadas:", comprasData)
-      const comprasNormalizadas = comprasData?.map(compra => ({
+      const comprasNormalizadas = comprasData?.map((compra) => ({
         ...compra,
         fecha: normalizarFecha(compra.fecha),
       })) || []
       setCompras(comprasNormalizadas)
       setSupermercados(supermercadosData || [])
     } catch (error) {
-      console.error("Error cargando datos:", error)
       setError("Error inesperado al cargar los datos")
     } finally {
       setLoading(false)
@@ -172,8 +159,7 @@ export default function DashboardPage() {
       return
     }
 
-    // Parsear la fecha manualmente para evitar problemas de zona horaria
-    const fechaCompra = parsearFechaLocal(nuevaCompra.fecha)
+    const fechaCompra = new Date(nuevaCompra.fecha)
     if (isNaN(fechaCompra.getTime())) {
       setError("La fecha es inválida")
       return
@@ -181,8 +167,6 @@ export default function DashboardPage() {
 
     const mes = fechaCompra.getMonth() + 1
     const año = fechaCompra.getFullYear()
-
-    console.log("Fecha ingresada:", nuevaCompra.fecha, "Mes calculado:", mes, "Año calculado:", año)
 
     try {
       const {
@@ -199,13 +183,11 @@ export default function DashboardPage() {
         categoria: nuevaCompra.categoria,
         precio,
         cantidad,
-        fecha: nuevaCompra.fecha,
+        fecha: nuevaCompra.fecha, // Usar la fecha tal cual la seleccionó el usuario
         supermercado_id: nuevaCompra.supermercado_id,
         mes,
         año,
       }
-
-      console.log("Insertando compra:", compra)
 
       const { data, error: supabaseError } = await supabase
         .from("compras")
@@ -217,7 +199,6 @@ export default function DashboardPage() {
         .single()
 
       if (supabaseError) {
-        console.error("Error de Supabase al insertar:", supabaseError)
         setError(`Error al guardar: ${supabaseError.message}`)
         return
       }
@@ -240,7 +221,6 @@ export default function DashboardPage() {
       })
       setDialogoAbierto(false)
     } catch (error) {
-      console.error("Error agregando compra:", error)
       setError("Error inesperado al agregar la compra")
     }
   }
@@ -273,7 +253,7 @@ export default function DashboardPage() {
       return
     }
 
-    const fechaCompra = parsearFechaLocal(nuevaCompra.fecha)
+    const fechaCompra = new Date(nuevaCompra.fecha)
     if (isNaN(fechaCompra.getTime())) {
       setError("La fecha es inválida")
       return
@@ -282,21 +262,17 @@ export default function DashboardPage() {
     const mes = fechaCompra.getMonth() + 1
     const año = fechaCompra.getFullYear()
 
-    console.log("Fecha editada:", nuevaCompra.fecha, "Mes calculado:", mes, "Año calculado:", año)
-
     try {
       const compraActualizada = {
         nombre: nuevaCompra.nombre.trim(),
         categoria: nuevaCompra.categoria,
         precio,
         cantidad,
-        fecha: nuevaCompra.fecha,
+        fecha: nuevaCompra.fecha, // Usar la fecha tal cual la seleccionó el usuario
         supermercado_id: nuevaCompra.supermercado_id,
         mes,
         año,
       }
-
-      console.log("Actualizando compra:", compraActualizada)
 
       const { error: supabaseError } = await supabase
         .from("compras")
@@ -304,7 +280,6 @@ export default function DashboardPage() {
         .eq("id", compraEditando.id)
 
       if (supabaseError) {
-        console.error("Error de Supabase al actualizar:", supabaseError)
         setError(`Error al guardar: ${supabaseError.message}`)
         return
       }
@@ -312,7 +287,6 @@ export default function DashboardPage() {
       await cargarDatos()
       cerrarDialogo()
     } catch (error) {
-      console.error("Error editando compra:", error)
       setError("Error inesperado al editar la compra")
     }
   }
@@ -322,14 +296,12 @@ export default function DashboardPage() {
       const { error: supabaseError } = await supabase.from("compras").delete().eq("id", id)
 
       if (supabaseError) {
-        console.error("Error de Supabase al eliminar:", supabaseError)
         setError(`Error al eliminar: ${supabaseError.message}`)
         return
       }
 
       setCompras(compras.filter((compra) => compra.id !== id))
     } catch (error) {
-      console.error("Error eliminando compra:", error)
       setError("Error inesperado al eliminar la compra")
     }
   }
