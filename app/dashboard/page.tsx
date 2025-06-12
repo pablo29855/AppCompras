@@ -47,7 +47,7 @@ export default function DashboardPage() {
     categoria: "Alimentación",
     precio: "",
     cantidad: "1",
-    fecha: new Date().toISOString().split("T")[0], // "2025-06-06"
+    fecha: new Date().toISOString().split("T")[0], // "2025-06-12"
     supermercado_id: null as string | null,
   })
   const [error, setError] = useState("")
@@ -56,15 +56,10 @@ export default function DashboardPage() {
   const fechaActual = new Date()
   const mesActual = fechaActual.getMonth() + 1 // 6 (junio)
   const añoActual = fechaActual.getFullYear() // 2025
-  const fechaHoy = fechaActual.toISOString().split("T")[0] // "2025-06-06"
+  const fechaHoy = fechaActual.toISOString().split("T")[0] // "2025-06-12"
 
   // Función para normalizar fechas a YYYY-MM-DD
-  const normalizarFecha = (fecha: string | Date): string => {
-    if (typeof fecha === "string") {
-      return fecha.split("T")[0]
-    }
-    return fecha.toISOString().split("T")[0]
-  }
+  const normalizarFecha = (fecha: string): string => fecha.split("T")[0]
 
   useEffect(() => {
     cargarDatos()
@@ -159,14 +154,8 @@ export default function DashboardPage() {
       return
     }
 
-    const fechaCompra = new Date(nuevaCompra.fecha)
-    if (isNaN(fechaCompra.getTime())) {
-      setError("La fecha es inválida")
-      return
-    }
-
-    const mes = fechaCompra.getMonth() + 1
-    const año = fechaCompra.getFullYear()
+    // Extraer mes y año directamente del string de fecha sin convertir a Date
+    const [año, mes] = nuevaCompra.fecha.split("-").map(Number)
 
     try {
       const {
@@ -183,7 +172,7 @@ export default function DashboardPage() {
         categoria: nuevaCompra.categoria,
         precio,
         cantidad,
-        fecha: nuevaCompra.fecha, // Usar la fecha tal cual la seleccionó el usuario
+        fecha: nuevaCompra.fecha, // Guardar la fecha como string puro YYYY-MM-DD
         supermercado_id: nuevaCompra.supermercado_id,
         mes,
         año,
@@ -253,14 +242,8 @@ export default function DashboardPage() {
       return
     }
 
-    const fechaCompra = new Date(nuevaCompra.fecha)
-    if (isNaN(fechaCompra.getTime())) {
-      setError("La fecha es inválida")
-      return
-    }
-
-    const mes = fechaCompra.getMonth() + 1
-    const año = fechaCompra.getFullYear()
+    // Extraer mes y año directamente del string de fecha sin convertir a Date
+    const [año, mes] = nuevaCompra.fecha.split("-").map(Number)
 
     try {
       const compraActualizada = {
@@ -268,7 +251,7 @@ export default function DashboardPage() {
         categoria: nuevaCompra.categoria,
         precio,
         cantidad,
-        fecha: nuevaCompra.fecha, // Usar la fecha tal cual la seleccionó el usuario
+        fecha: nuevaCompra.fecha, // Guardar la fecha como string puro YYYY-MM-DD
         supermercado_id: nuevaCompra.supermercado_id,
         mes,
         año,
@@ -647,7 +630,7 @@ export default function DashboardPage() {
                       </div>
                       <div className="flex justify-between">
                         <span>Fecha:</span>
-                        <span>{new Date(compra.fecha).toLocaleDateString("es-CO")}</span>
+                        <span>{compra.fecha}</span> {/* Mostrar como string puro */}
                       </div>
                       {compra.supermercado && (
                         <div className="flex justify-between">
@@ -696,7 +679,7 @@ export default function DashboardPage() {
                         <TableCell>
                           <div className="flex items-center gap-1">
                             <CalendarDays className="h-4 w-4 text-gray-400" />
-                            {new Date(compra.fecha).toLocaleDateString("es-CO")}
+                            {compra.fecha} {/* Mostrar como string puro */}
                           </div>
                         </TableCell>
                         <TableCell>{compra.supermercado?.nombre || "Sin especificar"}</TableCell>
