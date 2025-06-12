@@ -48,27 +48,6 @@ export default function AuthForm() {
         return
       }
 
-      // Verificar si el correo ya está registrado
-      const { data: existingUser, error: checkError } = await supabase
-        .from("auth.users")
-        .select("email")
-        .eq("email", email.toLowerCase().trim())
-        .single()
-
-      if (checkError && checkError.code !== "PGRST116") { // PGRST116 indica no encontrado
-        setMessage("Error al verificar el correo.")
-        setMessageType("error")
-        setLoading(false)
-        return
-      }
-
-      if (existingUser) {
-        setMessage("Este correo electrónico ya está registrado. Intenta iniciar sesión.")
-        setMessageType("error")
-        setLoading(false)
-        return
-      }
-
       // Intentar registrar el usuario directamente sin requerir confirmación de correo
       const { data, error } = await supabase.auth.signUp({
         email: email.toLowerCase().trim(),
@@ -110,7 +89,6 @@ export default function AuthForm() {
           .select()
 
         if (profileError) {
-          // Si falla crear el perfil, no bloqueamos el flujo, solo logueamos
           setMessage("Cuenta creada, pero hubo un error al guardar el perfil.")
           setMessageType("error")
         } else {
