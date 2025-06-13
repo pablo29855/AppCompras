@@ -48,23 +48,20 @@ export default function AuthForm() {
         return
       }
 
-      // Intentar registrar el usuario directamente sin requerir confirmación de correo
+      // Intentar registrar el usuario
       const { data, error } = await supabase.auth.signUp({
         email: email.toLowerCase().trim(),
         password,
         options: {
           emailRedirectTo: `${getBaseUrl()}/dashboard`,
-          data: {
-            email_confirmed: true,
-          },
         },
       })
 
       if (error) {
         // Manejar diferentes tipos de errores de Supabase
         if (error.message.includes("already registered") || error.message.includes("already exists")) {
-          setMessage("Este correo electrónico ya está registrado. Intenta iniciar sesión.")
-          setMessageType("error")
+          setMessage("Cuenta creada exitosamente, verifica tu correo para completar el registro.")
+          setMessageType("success")
         } else if (error.message.includes("Invalid email")) {
           setMessage("Por favor ingresa un correo electrónico válido.")
           setMessageType("error")
@@ -79,7 +76,7 @@ export default function AuthForm() {
           setMessageType("error")
         }
       } else if (data.user) {
-        // Crear perfil de usuario
+        // Intentar crear perfil de usuario (opcional, no bloquea el flujo)
         const { error: profileError } = await supabase
           .from("user_profiles")
           .insert({
@@ -88,16 +85,11 @@ export default function AuthForm() {
           })
           .select()
 
-        if (profileError) {
-          setMessage("Cuenta creada, pero hubo un error al guardar el perfil.")
-          setMessageType("error")
-        } else {
-          setMessage("Cuenta creada exitosamente. Iniciando sesión...")
-          setMessageType("success")
-          setTimeout(() => {
-            router.push("/dashboard")
-          }, 1500) // Retraso para mostrar el mensaje
-        }
+        setMessage("Cuenta creada exitosamente, verifica tu correo para completar el registro.")
+        setMessageType("success")
+        setTimeout(() => {
+          router.push("/dashboard")
+        }, 1500)
       } else {
         setMessage("Error inesperado al crear la cuenta. Intenta nuevamente.")
         setMessageType("error")
