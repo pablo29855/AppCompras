@@ -12,6 +12,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { ShoppingCart, Mail, Lock, KeyRound } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { getBaseUrl, getResetPasswordUrl } from "@/lib/utils/url"
+import Link from "next/link"
 
 export default function AuthForm() {
   const [email, setEmail] = useState("")
@@ -27,7 +28,7 @@ export default function AuthForm() {
   const [resetEmailSent, setResetEmailSent] = useState(false)
 
   const handleSignUp = async (e: React.FormEvent) => {
-    e.preventDefault()
+    e.preventDefault() // Asegura que no se recargue la página
     setLoading(true)
     setMessage("")
     setMessageType("")
@@ -87,9 +88,6 @@ export default function AuthForm() {
 
         setMessage("Cuenta creada exitosamente, verifica tu correo para completar el registro.")
         setMessageType("success")
-        setTimeout(() => {
-          router.push("/dashboard")
-        }, 1500)
       } else {
         setMessage("Error inesperado al crear la cuenta. Intenta nuevamente.")
         setMessageType("error")
@@ -103,7 +101,7 @@ export default function AuthForm() {
   }
 
   const handleSignIn = async (e: React.FormEvent) => {
-    e.preventDefault()
+    e.preventDefault() // Asegura que no se recargue la página
     setLoading(true)
     setMessage("")
     setMessageType("")
@@ -164,7 +162,7 @@ export default function AuthForm() {
   }
 
   const handleSendResetCode = async (e: React.FormEvent) => {
-    e.preventDefault()
+    e.preventDefault() // Asegura que no se recargue la página
     setLoading(true)
     setMessage("")
     setMessageType("")
@@ -321,6 +319,13 @@ export default function AuthForm() {
                     {loading ? "Creando cuenta..." : "Crear Cuenta"}
                   </Button>
                 </form>
+                {messageType === "success" && message.includes("verifica tu correo") && (
+                  <div className="mt-4 text-center">
+                    <Link href="/dashboard" className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 text-sm underline">
+                      Ir al Dashboard
+                    </Link>
+                  </div>
+                )}
               </TabsContent>
             </Tabs>
           ) : (
