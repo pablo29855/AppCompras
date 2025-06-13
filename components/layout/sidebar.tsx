@@ -11,7 +11,7 @@ const menuItems = [
   { href: "/dashboard", icon: Home, label: "Inicio" },
   { href: "/dashboard/meses", icon: Calendar, label: "Compras por Mes" },
   { href: "/dashboard/supermercados", icon: Store, label: "Supermercados" },
-  { href: "/dashboard/lista-compras", icon: ShoppingCart, label: "Lista de Compras" },
+  { href: "/dashboard/Lista-compras", icon: ShoppingCart, label: "Lista de Compras" },
   { href: "/dashboard/mapa", icon: MapPin, label: "Mapa de Tiendas" },
 ]
 
