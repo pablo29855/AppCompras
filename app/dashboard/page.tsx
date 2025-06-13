@@ -675,7 +675,7 @@ export default function DashboardPage() {
                             {compra.categoria}
                           </Badge>
                         </TableCell>
-                        <TableCell>${compra.precio.toLocaleString("es-CO")} COP</Cell>
+                        <TableCell>${compra.precio.toLocaleString("es-CO")} COP</TableCell>
                         <TableCell>
                           <div className="flex items-center gap-1">
                             <Package className="h-4 w-4 text-gray-400" />
