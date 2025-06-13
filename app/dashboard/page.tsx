@@ -34,6 +34,15 @@ const coloresCategorias: { [key: string]: string } = {
   Otros: "bg-orange-100 text-orange-800",
 }
 
+// Función para obtener la fecha actual en la zona horaria local como YYYY-MM-DD
+const getLocalDateString = (): string => {
+  const date = new Date()
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, "0") // Meses de 0-11, sumamos 1
+  const day = String(date.getDate()).padStart(2, "0")
+  return `${year}-${month}-${day}`
+}
+
 export default function DashboardPage() {
   const [compras, setCompras] = useState<Compra[]>([])
   const [supermercados, setSupermercados] = useState<Supermercado[]>([])
@@ -47,7 +56,7 @@ export default function DashboardPage() {
     categoria: "Alimentación",
     precio: "",
     cantidad: "1",
-    fecha: new Date().toISOString().split("T")[0], // "2025-06-12"
+    fecha: getLocalDateString(), // Usar fecha local
     supermercado_id: null as string | null,
   })
   const [error, setError] = useState("")
@@ -56,9 +65,9 @@ export default function DashboardPage() {
   const fechaActual = new Date()
   const mesActual = fechaActual.getMonth() + 1 // 6 (junio)
   const añoActual = fechaActual.getFullYear() // 2025
-  const fechaHoy = fechaActual.toISOString().split("T")[0] // "2025-06-12"
+  const fechaHoy = getLocalDateString() // "2025-06-12" en la zona horaria local
 
-  // Función para normalizar fechas a YYYY-MM-DD
+  // Función para normalizar fechas a YYYY-MM-DD (sin ajustar zona horaria)
   const normalizarFecha = (fecha: string): string => fecha.split("T")[0]
 
   useEffect(() => {
@@ -205,7 +214,7 @@ export default function DashboardPage() {
         categoria: "Alimentación",
         precio: "",
         cantidad: "1",
-        fecha: fechaHoy,
+        fecha: getLocalDateString(), // Reiniciar con fecha local
         supermercado_id: null,
       })
       setDialogoAbierto(false)
@@ -312,7 +321,7 @@ export default function DashboardPage() {
       categoria: "Alimentación",
       precio: "",
       cantidad: "1",
-      fecha: fechaHoy,
+      fecha: getLocalDateString(), // Reiniciar con fecha local
       supermercado_id: null,
     })
   }
@@ -666,7 +675,7 @@ export default function DashboardPage() {
                             {compra.categoria}
                           </Badge>
                         </TableCell>
-                        <TableCell>${compra.precio.toLocaleString("es-CO")} COP</TableCell>
+                        <TableCell>${compra.precio.toLocaleString("es-CO")} COP</Cell>
                         <TableCell>
                           <div className="flex items-center gap-1">
                             <Package className="h-4 w-4 text-gray-400" />
